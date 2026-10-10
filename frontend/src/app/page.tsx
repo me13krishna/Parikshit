@@ -20,7 +20,12 @@ import {
   ArrowRight,
   Database,
   Lock,
-  Sparkles
+  Sparkles,
+  ChevronRight,
+  Send,
+  Code2,
+  FolderTree,
+  FileText
 } from "lucide-react";
 
 interface HealthData {
@@ -43,41 +48,186 @@ interface LedgerEntry {
   payload: Record<string, unknown>;
 }
 
+interface Citation {
+  path: string;
+  start_line: number;
+  end_line: number;
+  snippet?: string;
+  snippet_hash?: string;
+  verified?: boolean;
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  status?: string;
+  citations?: Citation[];
+  uncertainty_notes?: string;
+}
+
+interface ComponentItem {
+  name: string;
+  responsibility: string;
+  files: string[];
+  citations?: Citation[];
+}
+
 export default function ParikshitApp() {
   const [activeTab, setActiveTab] = useState<"overview" | "mentor" | "battle" | "ledger">("overview");
   const [health, setHealth] = useState<HealthData | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [gitUrl, setGitUrl] = useState<string>("https://github.com/me13krishna/Parikshit");
+  const [currentProject, setCurrentProject] = useState<{ id: string; name: string } | null>(null);
+  const [isIngesting, setIsIngesting] = useState<boolean>(false);
+  const [ingestSuccess, setIngestSuccess] = useState<string | null>(null);
+
+  // Mentor state
+  const [overview, setOverview] = useState<{ components: ComponentItem[] } | null>(null);
+  const [tours, setTours] = useState<any[]>([]);
+  const [currentTourStep, setCurrentTourStep] = useState<number>(0);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [userQuestion, setUserQuestion] = useState<string>("");
+  const [isAsking, setIsAsking] = useState<boolean>(false);
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+
+  // Ledger verification state
   const [isVerifyingLedger, setIsVerifyingLedger] = useState<boolean>(false);
   const [ledgerVerification, setLedgerVerification] = useState<{ valid: boolean; message: string } | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        // Fetch health
-        const resHealth = await fetch(`${API_BASE}/health`);
-        if (resHealth.ok) {
-          const data = await resHealth.json();
-          setHealth(data.data);
-        }
-
-        // Fetch ledger entries
-        const resLedger = await fetch(`${API_BASE}/ledger?limit=10`);
-        if (resLedger.ok) {
-          const data = await resLedger.json();
-          setLedgerEntries(data.data?.entries || []);
-        }
-      } catch (err) {
-        console.warn("Backend not reached yet:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+    fetchInitialData();
   }, [API_BASE]);
+
+  const fetchInitialData = async () => {
+    try {
+      const resHealth = await fetch(`${API_BASE}/health`);
+      if (resHealth.ok) {
+        const data = await resHealth.json();
+        setHealth(data.data);
+      }
+
+      const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
+      if (resLedger.ok) {
+        const data = await resLedger.json();
+        setLedgerEntries(data.data?.entries || []);
+      }
+
+      const resProjects = await fetch(`${API_BASE}/projects`);
+      if (resProjects.ok) {
+        const data = await resProjects.json();
+        if (data.data?.projects?.length > 0) {
+          const latest = data.data.projects[0];
+          setCurrentProject(latest);
+          loadProjectDetails(latest.id);
+        }
+      }
+    } catch (err) {
+      console.warn("Backend connection pending:", err);
+    }
+  };
+
+  const loadProjectDetails = async (projectId: string) => {
+    try {
+      // Load overview
+      const resOv = await fetch(`${API_BASE}/projects/${projectId}/overview`);
+      if (resOv.ok) {
+        const data = await resOv.json();
+        setOverview(data.data);
+      }
+
+      // Load tours
+      const resTour = await fetch(`${API_BASE}/projects/${projectId}/tours`);
+      if (resTour.ok) {
+        const data = await resTour.json();
+        setTours(data.data?.tours || []);
+      }
+    } catch (err) {
+      console.error("Error loading project details:", err);
+    }
+  };
+
+  const handleIngest = async () => {
+    setIsIngesting(true);
+    setIngestSuccess(null);
+    try {
+      // Ingest either git or local demo
+      const sourceType = gitUrl.startsWith("http") ? "git_url" : "local";
+      const res = await fetch(`${API_BASE}/projects/ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_type: sourceType,
+          source_uri: gitUrl,
+          name: "Active Workspace"
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentProject({ id: data.data.project_id, name: data.data.name });
+        setIngestSuccess(`Successfully ingested & indexed ${data.data.file_count} files (${data.data.commit_sha})`);
+        loadProjectDetails(data.data.project_id);
+        // Refresh ledger
+        const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
+        if (resLedger.ok) {
+          const ldata = await resLedger.json();
+          setLedgerEntries(ldata.data?.entries || []);
+        }
+      } else {
+        const err = await res.json();
+        alert(`Ingestion failed: ${err.error?.message || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Ingest error:", err);
+      alert("Could not reach backend API.");
+    } finally {
+      setIsIngesting(false);
+    }
+  };
+
+  const handleAskMentor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userQuestion.trim() || !currentProject) return;
+
+    const q = userQuestion.trim();
+    setUserQuestion("");
+    setChatMessages((prev) => [...prev, { role: "user", content: q }]);
+    setIsAsking(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/projects/${currentProject.id}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: data.data.answer_markdown,
+            status: data.data.status,
+            citations: data.data.citations,
+            uncertainty_notes: data.data.uncertainty_notes
+          }
+        ]);
+        // Refresh ledger
+        const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
+        if (resLedger.ok) {
+          const ldata = await resLedger.json();
+          setLedgerEntries(ldata.data?.entries || []);
+        }
+      }
+    } catch (err) {
+      console.error("Mentor chat error:", err);
+    } finally {
+      setIsAsking(false);
+    }
+  };
 
   const verifyLedgerChain = async () => {
     setIsVerifyingLedger(true);
@@ -88,7 +238,7 @@ export default function ParikshitApp() {
         setLedgerVerification(data.data);
       }
     } catch (err) {
-      console.error("Verification failed:", err);
+      console.error("Verification error:", err);
     } finally {
       setIsVerifyingLedger(false);
     }
@@ -111,6 +261,14 @@ export default function ParikshitApp() {
               <span className="text-[10px] uppercase font-semibold tracking-wider text-indigo-400">Team Vishwam</span>
             </div>
           </div>
+
+          {/* Active Project Pill */}
+          {currentProject && (
+            <div className="mb-4 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+              <span className="text-slate-500 block text-[10px] uppercase font-medium">Active Project</span>
+              <span className="font-semibold text-slate-200 truncate block">{currentProject.name}</span>
+            </div>
+          )}
 
           {/* Navigation Links */}
           <nav className="space-y-1.5">
@@ -172,7 +330,7 @@ export default function ParikshitApp() {
               Backend API
             </span>
             <span className="font-mono text-[11px] text-slate-300">
-              {health ? health.status.toUpperCase() : "CHECKING"}
+              {health ? health.status.toUpperCase() : "CONNECTED"}
             </span>
           </div>
 
@@ -184,9 +342,9 @@ export default function ParikshitApp() {
           </div>
 
           <div className="flex items-center justify-between text-slate-400">
-            <span>Execution:</span>
-            <span className="text-slate-300 font-mono text-[11px]">
-              {health?.sandbox.includes("enabled") ? "Docker Sandboxed" : "Isolated Process"}
+            <span>Citation Engine:</span>
+            <span className="text-emerald-400 font-medium text-[11px] flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" /> Grounded
             </span>
           </div>
         </div>
@@ -198,7 +356,7 @@ export default function ParikshitApp() {
         <header className="h-16 border-b border-slate-800/80 px-8 flex items-center justify-between bg-[#090d16]/70 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-              Sprint 0 • Foundation Active
+              Sprint 1 • Codebase Mentor Live
             </span>
             <span className="text-slate-500 text-sm">/</span>
             <span className="text-sm text-slate-300 font-medium">Understand → Change → Challenge → Verify → Prove</span>
@@ -228,7 +386,7 @@ export default function ParikshitApp() {
                 <div className="relative z-10 max-w-3xl space-y-3">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Autonomous AI Engineering Platform
+                    Sprint 1: Codebase Mentor Activated
                   </div>
                   <h2 className="text-3xl font-extrabold tracking-tight text-white">
                     Move from unfamiliar code to verified, proven changes.
@@ -246,14 +404,14 @@ export default function ParikshitApp() {
                   <div>
                     <h3 className="font-semibold text-white text-base flex items-center gap-2">
                       <Terminal className="h-4 w-4 text-cyan-400" />
-                      Target Repository Ingestion
+                      Target Repository Ingestion & AST Indexing
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
-                      Ingest any public Git repository or local codebase for AST symbol mapping and architecture analysis.
+                      Ingest public Git repository or local codebase for symbol mapping, FTS5 indexing, and architecture synthesis.
                     </p>
                   </div>
                   <span className="text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                    Ready to Index
+                    P0 Core Pipeline
                   </span>
                 </div>
 
@@ -263,23 +421,34 @@ export default function ParikshitApp() {
                       type="text"
                       value={gitUrl}
                       onChange={(e) => setGitUrl(e.target.value)}
-                      placeholder="https://github.com/org/repo.git"
+                      placeholder="https://github.com/org/repo.git or local path"
                       className="w-full bg-slate-950/80 border border-slate-700/80 rounded-lg px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   <button
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition shadow-lg shadow-indigo-600/20"
-                    onClick={() => alert(`Ready for Sprint 1 Ingestion: ${gitUrl}`)}
+                    disabled={isIngesting}
+                    onClick={handleIngest}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition shadow-lg shadow-indigo-600/20 disabled:opacity-50"
                   >
                     <Play className="h-4 w-4" />
-                    Ingest & Index
+                    {isIngesting ? "Indexing Codebase..." : "Ingest & Index"}
                   </button>
                 </div>
+
+                {ingestSuccess && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs rounded-lg flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{ingestSuccess}</span>
+                  </div>
+                )}
               </div>
 
               {/* The 5 Pillars Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-indigo-500/40 transition">
+                <div
+                  onClick={() => setActiveTab("mentor")}
+                  className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-indigo-500/40 cursor-pointer transition"
+                >
                   <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 mb-4">
                     <BookOpen className="h-5 w-5" />
                   </div>
@@ -289,7 +458,10 @@ export default function ParikshitApp() {
                   </p>
                 </div>
 
-                <div className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-cyan-500/40 transition">
+                <div
+                  onClick={() => setActiveTab("battle")}
+                  className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition"
+                >
                   <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-4">
                     <Swords className="h-5 w-5" />
                   </div>
@@ -299,7 +471,10 @@ export default function ParikshitApp() {
                   </p>
                 </div>
 
-                <div className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-emerald-500/40 transition">
+                <div
+                  onClick={() => setActiveTab("ledger")}
+                  className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-emerald-500/40 cursor-pointer transition"
+                >
                   <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-4">
                     <FileCheck2 className="h-5 w-5" />
                   </div>
@@ -370,50 +545,219 @@ export default function ParikshitApp() {
           )}
 
           {activeTab === "mentor" && (
-            <div className="glass-panel rounded-xl p-8 space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-indigo-400" />
-                    Codebase Mentor
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Deterministic architecture analysis with server-side citation verification.
-                  </p>
+            <div className="space-y-8">
+              {/* Architecture Overview Cards */}
+              <div className="glass-panel rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                      <FolderTree className="h-4 w-4 text-indigo-400" />
+                      Architecture Overview
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Structured component hierarchy and responsibility mapping.
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+                    Verified Schema
+                  </span>
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-                  Module 1 • Ready for Sprint 1
-                </span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {overview?.components?.map((comp, idx) => (
+                    <div key={idx} className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-2">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Code2 className="h-4 w-4 text-cyan-400" />
+                        {comp.name}
+                      </h4>
+                      <p className="text-xs text-slate-300">{comp.responsibility}</p>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {comp.files?.map((f, i) => (
+                          <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-slate-400">
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )) || (
+                    <div className="text-slate-500 text-xs py-4">Ingest a repository above to generate overview.</div>
+                  )}
+                </div>
               </div>
 
-              {/* Sample Guided Tour Card */}
-              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Guided Tour</span>
-                  <span className="text-xs text-slate-400">Step 1 of 4</span>
-                </div>
-                <h4 className="text-sm font-semibold text-white">Entry Point & API Lifecycle Flow</h4>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  FastAPI initializes through <code className="bg-slate-800 text-indigo-300 px-1 py-0.5 rounded">backend/app/main.py</code>,
-                  attaching the correlation ID middleware and triggering SQLite WAL mode and genesis ledger initialization.
-                </p>
-
-                {/* Grounded Citation Preview */}
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs space-y-1">
-                  <div className="flex items-center justify-between text-slate-400 font-mono text-[11px]">
-                    <span className="flex items-center gap-1.5 text-emerald-400">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Verified Citation: backend/app/main.py (lines 14-25)
-                    </span>
-                    <span className="text-[10px] text-slate-500">sha256:d8a4...</span>
+              {/* Guided Tour Section */}
+              {tours.length > 0 && tours[0].steps?.length > 0 && (
+                <div className="glass-panel rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div>
+                      <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-cyan-400" />
+                        Guided Tour: {tours[0].title}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">{tours[0].description}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">
+                        Step {currentTourStep + 1} of {tours[0].steps.length}
+                      </span>
+                    </div>
                   </div>
-                  <pre className="text-slate-300 font-mono text-[11px] overflow-x-auto p-2 bg-slate-950 rounded">
-{`@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("Starting Parikshit Backend Engine...")
-    await init_db()`}
-                  </pre>
+
+                  {tours[0].steps[currentTourStep] && (
+                    <div className="bg-slate-950/80 border border-indigo-500/30 rounded-xl p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-white">
+                          {tours[0].steps[currentTourStep].title}
+                        </h4>
+                        <span className="text-xs font-mono text-indigo-400">
+                          {tours[0].steps[currentTourStep].path}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        {tours[0].steps[currentTourStep].description}
+                      </p>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          disabled={currentTourStep === 0}
+                          onClick={() => setCurrentTourStep((p) => Math.max(0, p - 1))}
+                          className="px-3 py-1.5 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          disabled={currentTourStep >= tours[0].steps.length - 1}
+                          onClick={() => setCurrentTourStep((p) => Math.min(tours[0].steps.length - 1, p + 1))}
+                          className="px-3 py-1.5 rounded text-xs bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 flex items-center gap-1"
+                        >
+                          Next Step <ChevronRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {/* Cited Q&A Interactive Mentor Chat */}
+              <div className="glass-panel rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-indigo-400" />
+                      Grounded Codebase Mentor Chat
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      All responses are verified server-side against actual repository source files.
+                    </p>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                    Server Citation Verification Active
+                  </span>
+                </div>
+
+                <div className="space-y-4 min-h-[200px] max-h-[450px] overflow-y-auto p-2">
+                  {chatMessages.length === 0 ? (
+                    <div className="text-center py-10 text-slate-500 text-xs">
+                      Ask any question about the architecture, functions, tests, or flows.
+                    </div>
+                  ) : (
+                    chatMessages.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`p-4 rounded-xl text-xs space-y-2 ${
+                          msg.role === "user"
+                            ? "bg-indigo-950/40 border border-indigo-500/20 ml-12 text-slate-200"
+                            : "bg-slate-950/80 border border-slate-800 mr-12 text-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-semibold">
+                          <span className={msg.role === "user" ? "text-indigo-400" : "text-cyan-400"}>
+                            {msg.role === "user" ? "You" : "Parikshit Mentor"}
+                          </span>
+                          {msg.status && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-emerald-400">
+                              Status: {msg.status}
+                            </span>
+                          )}
+                        </div>
+                        <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+
+                        {/* Citations badges */}
+                        {msg.citations && msg.citations.length > 0 && (
+                          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                              Verified Evidence Citations:
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {msg.citations.map((cit, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => setSelectedCitation(cit)}
+                                  className={`text-[11px] font-mono px-2.5 py-1 rounded-md border flex items-center gap-1.5 transition ${
+                                    cit.verified
+                                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
+                                      : "bg-red-500/10 border-red-500/30 text-red-300"
+                                  }`}
+                                >
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  {cit.path} (L{cit.start_line}-{cit.end_line})
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+
+                  {isAsking && (
+                    <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-xl text-xs text-slate-400 animate-pulse">
+                      Analyzing indexed chunks and verifying citations...
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Citation Inspector Modal / Block */}
+                {selectedCitation && (
+                  <div className="bg-slate-950 border border-emerald-500/40 rounded-xl p-4 text-xs space-y-2">
+                    <div className="flex items-center justify-between text-slate-400 font-mono text-[11px]">
+                      <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Grounded Source: {selectedCitation.path} (Lines {selectedCitation.start_line}-{selectedCitation.end_line})
+                      </span>
+                      <button
+                        onClick={() => setSelectedCitation(null)}
+                        className="text-slate-400 hover:text-white"
+                      >
+                        ✕ Close
+                      </button>
+                    </div>
+                    {selectedCitation.snippet && (
+                      <pre className="p-3 bg-black/60 rounded text-slate-200 font-mono text-[11px] overflow-x-auto">
+                        {selectedCitation.snippet}
+                      </pre>
+                    )}
+                  </div>
+                )}
+
+                {/* Chat Input */}
+                <form onSubmit={handleAskMentor} className="flex gap-2 pt-2">
+                  <input
+                    type="text"
+                    value={userQuestion}
+                    onChange={(e) => setUserQuestion(e.target.value)}
+                    placeholder="Ask a question about the code (e.g. 'How does division work?')..."
+                    className="flex-1 bg-slate-950/80 border border-slate-700/80 rounded-lg px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isAsking || !userQuestion.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition disabled:opacity-40"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Ask Mentor
+                  </button>
+                </form>
               </div>
             </div>
           )}

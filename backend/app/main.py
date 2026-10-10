@@ -12,6 +12,7 @@ from app.services.ledger_service import LedgerService
 from app.api.health import router as health_router
 from app.api.ledger import router as ledger_router
 from app.api.projects import router as projects_router
+from app.api.mentor import router as mentor_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,6 +88,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(ledger_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
+app.include_router(mentor_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

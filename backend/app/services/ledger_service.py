@@ -108,7 +108,7 @@ class LedgerService:
                 )
             else:
                 cursor = await db.execute(
-                    "SELECT * FROM ledger_entries ORDER BY sequence ASC;"
+                    "SELECT * FROM ledger_entries WHERE project_id IS NULL ORDER BY sequence ASC;"
                 )
             entries = await cursor.fetchall()
 
