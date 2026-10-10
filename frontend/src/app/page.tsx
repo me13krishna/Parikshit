@@ -443,8 +443,8 @@ export default function ParikshitApp() {
         <div>
           {/* Logo & Tagline */}
           <div className="flex items-center gap-3 px-2 py-3 mb-6">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <ShieldCheck className="h-5 w-5 text-white" />
+            <div className="h-10 w-10 rounded-xl overflow-hidden ring-1 ring-indigo-500/30 shadow-lg shadow-indigo-500/20 bg-slate-900 flex-shrink-0">
+              <img src="/logo.jpg" alt="Parikshit Logo" className="h-full w-full object-cover" />
             </div>
             <div>
               <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">

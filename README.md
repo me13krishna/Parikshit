@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/parikshit_logo.jpg" alt="Parikshit Logo" width="160" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
+</p>
+
 # Parikshit – AI Engineering Teammate
 
 **Tagline:** An AI engineering teammate that moves developers from unfamiliar code to verified changes: **understand → change → challenge → verify → prove**.
