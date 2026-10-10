@@ -32,7 +32,9 @@ import {
   X,
   FileDiff,
   HeartPulse,
-  Flame
+  Flame,
+  Network,
+  Share2
 } from "lucide-react";
 
 interface HealthData {
@@ -80,7 +82,7 @@ interface ComponentItem {
 }
 
 export default function ParikshitApp() {
-  const [activeTab, setActiveTab] = useState<"overview" | "mentor" | "vibe" | "battle" | "ledger">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "mentor" | "vibe" | "battle" | "twin" | "ledger">("overview");
   const [health, setHealth] = useState<HealthData | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [gitUrl, setGitUrl] = useState<string>("https://github.com/me13krishna/Parikshit");
@@ -114,6 +116,11 @@ export default function ParikshitApp() {
   const [isHealing, setIsHealing] = useState<boolean>(false);
   const [healResult, setHealResult] = useState<any | null>(null);
 
+  // Digital Twin state
+  const [twinGraph, setTwinGraph] = useState<any | null>(null);
+  const [impactData, setImpactData] = useState<any | null>(null);
+  const [isLoadingTwin, setIsLoadingTwin] = useState<boolean>(false);
+
   // Ledger verification state
   const [isVerifyingLedger, setIsVerifyingLedger] = useState<boolean>(false);
   const [ledgerVerification, setLedgerVerification] = useState<{ valid: boolean; message: string } | null>(null);
@@ -132,7 +139,7 @@ export default function ParikshitApp() {
         setHealth(data.data);
       }
 
-      const resLedger = await fetch(`${API_BASE}/ledger?limit=20`);
+      const resLedger = await fetch(`${API_BASE}/ledger?limit=25`);
       if (resLedger.ok) {
         const data = await resLedger.json();
         setLedgerEntries(data.data?.entries || []);
@@ -164,6 +171,13 @@ export default function ParikshitApp() {
       if (resTour.ok) {
         const data = await resTour.json();
         setTours(data.data?.tours || []);
+      }
+
+      // Load Digital Twin Graph
+      const resGraph = await fetch(`${API_BASE}/projects/${projectId}/graph`);
+      if (resGraph.ok) {
+        const gdata = await resGraph.json();
+        setTwinGraph(gdata.data);
       }
     } catch (err) {
       console.error("Error loading project details:", err);
@@ -333,9 +347,6 @@ export default function ParikshitApp() {
         const data = await res.json();
         setBattleReport(data.data);
         refreshLedger();
-      } else {
-        const err = await res.json();
-        alert(err.error?.message || "Battle initialization failed");
       }
     } catch (err) {
       console.error("Battle error:", err);
@@ -365,6 +376,23 @@ export default function ParikshitApp() {
     }
   };
 
+  const handleLoadImpact = async () => {
+    if (!currentTask) return;
+    setIsLoadingTwin(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${currentTask.task_id}/impact`);
+      if (res.ok) {
+        const data = await res.json();
+        setImpactData(data.data);
+      }
+    } catch (err) {
+      console.error("Impact comparison error:", err);
+    } finally {
+      setIsLoadingTwin(false);
+    }
+  };
+
   const handleHumanApproval = async (decision: "approved" | "rejected") => {
     if (!currentTask) return;
 
@@ -386,7 +414,7 @@ export default function ParikshitApp() {
   };
 
   const refreshLedger = async () => {
-    const resLedger = await fetch(`${API_BASE}/ledger?limit=20`);
+    const resLedger = await fetch(`${API_BASE}/ledger?limit=25`);
     if (resLedger.ok) {
       const ldata = await resLedger.json();
       setLedgerEntries(ldata.data?.entries || []);
@@ -485,6 +513,21 @@ export default function ParikshitApp() {
             </button>
 
             <button
+              onClick={() => {
+                setActiveTab("twin");
+                handleLoadImpact();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "twin"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              }`}
+            >
+              <Network className="h-4 w-4" />
+              Software Digital Twin
+            </button>
+
+            <button
               onClick={() => setActiveTab("ledger")}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === "ledger"
@@ -518,9 +561,9 @@ export default function ParikshitApp() {
           </div>
 
           <div className="flex items-center justify-between text-slate-400">
-            <span>Arena Status:</span>
+            <span>Twin Graph:</span>
             <span className="text-cyan-400 font-medium text-[11px] flex items-center gap-1">
-              <Swords className="h-3 w-3" /> Multi-Agent Ready
+              <Network className="h-3 w-3" /> {twinGraph?.total_nodes || 0} Nodes
             </span>
           </div>
         </div>
@@ -531,8 +574,8 @@ export default function ParikshitApp() {
         {/* Top Header */}
         <header className="h-16 border-b border-slate-800/80 px-8 flex items-center justify-between bg-[#090d16]/70 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-              Sprint 3 • AI Battle & Self-Healing Active
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+              All Sprints 0-4 Complete • Full Monorepo Live
             </span>
             <span className="text-slate-500 text-sm">/</span>
             <span className="text-sm text-slate-300 font-medium">Understand → Change → Challenge → Verify → Prove</span>
@@ -562,14 +605,14 @@ export default function ParikshitApp() {
                 <div className="relative z-10 max-w-3xl space-y-3">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Sprint 3: AI Battle Arena & Self-Healing
+                    Complete AI Engineering Teammate Architecture
                   </div>
                   <h2 className="text-3xl font-extrabold tracking-tight text-white">
                     Move from unfamiliar code to verified, proven changes.
                   </h2>
                   <p className="text-slate-300 text-sm leading-relaxed">
                     Parikshit pairs developers with adversarial agents: grounded retrieval with server-verified citations,
-                    isolated sandboxes, AI vs AI battle challenges, self-healing diagnostics, and cryptographic proof-of-work.
+                    isolated sandboxes, AI vs AI battle challenges, self-healing diagnostics, dependency digital twins, and cryptographic proof-of-work.
                   </p>
                 </div>
               </div>
@@ -858,7 +901,6 @@ export default function ParikshitApp() {
                         </div>
                         <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
 
-                        {/* Citations badges */}
                         {msg.citations && msg.citations.length > 0 && (
                           <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
                             <span className="text-[10px] uppercase font-bold text-slate-500 block">
@@ -893,7 +935,6 @@ export default function ParikshitApp() {
                   )}
                 </div>
 
-                {/* Selected Citation Inspector Modal / Block */}
                 {selectedCitation && (
                   <div className="bg-slate-950 border border-emerald-500/40 rounded-xl p-4 text-xs space-y-2">
                     <div className="flex items-center justify-between text-slate-400 font-mono text-[11px]">
@@ -916,7 +957,6 @@ export default function ParikshitApp() {
                   </div>
                 )}
 
-                {/* Chat Input */}
                 <form onSubmit={handleAskMentor} className="flex gap-2 pt-2">
                   <input
                     type="text"
@@ -940,7 +980,6 @@ export default function ParikshitApp() {
 
           {activeTab === "vibe" && (
             <div className="space-y-8">
-              {/* Task Creation Header */}
               <div className="glass-panel rounded-xl p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div>
@@ -976,12 +1015,11 @@ export default function ParikshitApp() {
                 </form>
               </div>
 
-              {/* Implementation Plan View */}
               {currentTask?.plan && (
                 <div className="glass-panel rounded-xl p-6 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div>
-                      <h4 className="font-semibold text-white text-sm">Implementation Plan (Review Before Code Generation)</h4>
+                      <h4 className="font-semibold text-white text-sm">Implementation Plan</h4>
                       <p className="text-xs text-slate-400 mt-0.5">{currentTask.plan.summary}</p>
                     </div>
                     {currentTask.status === "planning" && (
@@ -1033,7 +1071,6 @@ export default function ParikshitApp() {
                 </div>
               )}
 
-              {/* Workspace Diff & Sandbox Run Section */}
               {currentTask?.patch && (
                 <div className="glass-panel rounded-xl p-6 space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1053,7 +1090,6 @@ export default function ParikshitApp() {
                     </div>
                   </div>
 
-                  {/* Unified Diff Display */}
                   <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-[11px] overflow-x-auto max-h-80">
                     <pre className="text-slate-300">
                       {currentTask.patch.unified_diff.split("\n").map((line: string, idx: number) => (
@@ -1073,7 +1109,6 @@ export default function ParikshitApp() {
                     </pre>
                   </div>
 
-                  {/* Sandbox Run Test Results */}
                   {sandboxResult && (
                     <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between">
@@ -1118,7 +1153,6 @@ export default function ParikshitApp() {
                     </div>
                   )}
 
-                  {/* Self-Healing Diagnosis & Verdict Widget */}
                   {healResult && (
                     <div className="bg-slate-950/90 border border-amber-500/30 rounded-xl p-4 space-y-2">
                       <div className="flex items-center justify-between">
@@ -1134,7 +1168,6 @@ export default function ParikshitApp() {
                     </div>
                   )}
 
-                  {/* Human Approval Gate */}
                   <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
                     <div>
                       <span className="text-xs font-semibold text-slate-200 block">Human Approval Gate</span>
@@ -1176,7 +1209,6 @@ export default function ParikshitApp() {
 
           {activeTab === "battle" && (
             <div className="space-y-8">
-              {/* Battle Control Bar */}
               <div className="glass-panel rounded-xl p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div>
@@ -1205,7 +1237,6 @@ export default function ParikshitApp() {
                 )}
               </div>
 
-              {/* Battle Results */}
               {battleReport && (
                 <div className="glass-panel rounded-xl p-6 space-y-6">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1220,7 +1251,6 @@ export default function ParikshitApp() {
                     </span>
                   </div>
 
-                  {/* Rounds Breakdown */}
                   <div className="space-y-4">
                     {battleReport.rounds?.map((rnd: any, i: number) => (
                       <div key={i} className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
@@ -1248,7 +1278,6 @@ export default function ParikshitApp() {
                     ))}
                   </div>
 
-                  {/* Residual Risks Breakdown */}
                   {battleReport.residual_risks?.length > 0 && (
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-xs space-y-2">
                       <span className="font-bold text-amber-400 flex items-center gap-1.5">
@@ -1264,6 +1293,108 @@ export default function ParikshitApp() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "twin" && (
+            <div className="space-y-8">
+              {/* Digital Twin Header */}
+              <div className="glass-panel rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                      <Network className="h-4 w-4 text-cyan-400" />
+                      Software Digital Twin & Dependency Graph
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Interactive file & module graph with import edges, call hierarchies, and impact predictions.
+                    </p>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+                    Module 6 • Digital Twin
+                  </span>
+                </div>
+
+                {/* Graph Node Badges */}
+                <div className="space-y-3">
+                  <span className="text-xs font-semibold text-slate-300 block">Repository Modules & Artifacts:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {twinGraph?.nodes?.map((node: any) => (
+                      <div
+                        key={node.id}
+                        className="bg-slate-950 border border-slate-800 hover:border-cyan-500/40 p-3 rounded-lg text-xs flex items-center gap-3 transition"
+                      >
+                        <div className="h-8 w-8 rounded bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-xs">
+                          {node.language.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-white block">{node.label}</span>
+                          <span className="text-[10px] text-slate-500 block">{node.path}</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                          {node.kind}
+                        </span>
+                      </div>
+                    )) || (
+                      <div className="text-slate-500 text-xs py-2">Ingest a repository to populate graph nodes.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Impact Prediction vs Actual Comparison */}
+              <div className="glass-panel rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h4 className="font-semibold text-white text-sm">Impact Prediction vs Actual Workspace Diff</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Evaluates graph flow predictions against physical changes made by the Builder agent.
+                    </p>
+                  </div>
+                  <button
+                    disabled={!currentTask || isLoadingTwin}
+                    onClick={handleLoadImpact}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {isLoadingTwin ? "Calculating..." : "Compute Impact Precision"}
+                  </button>
+                </div>
+
+                {impactData ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Predicted Impact:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {impactData.predicted_files?.map((f: string, i: number) => (
+                          <span key={i} className="font-mono text-[10px] bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-cyan-300">
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Actual Modified Files:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {impactData.actual_files?.map((f: string, i: number) => (
+                          <span key={i} className="font-mono text-[10px] bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-emerald-300">
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="pt-2 flex gap-4 text-[11px] font-mono text-slate-400">
+                        <span>Precision: <strong className="text-white">{impactData.metrics?.precision * 100}%</strong></span>
+                        <span>Recall: <strong className="text-white">{impactData.metrics?.recall * 100}%</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-slate-500 text-xs py-2">
+                    Click "Compute Impact Precision" to evaluate graph predictions on the active task.
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
