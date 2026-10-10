@@ -30,7 +30,9 @@ import {
   TestTube2,
   Check,
   X,
-  FileDiff
+  FileDiff,
+  HeartPulse,
+  Flame
 } from "lucide-react";
 
 interface HealthData {
@@ -104,6 +106,14 @@ export default function ParikshitApp() {
   const [sandboxResult, setSandboxResult] = useState<any | null>(null);
   const [approvalDecision, setApprovalDecision] = useState<string | null>(null);
 
+  // Battle Arena state
+  const [isBattling, setIsBattling] = useState<boolean>(false);
+  const [battleReport, setBattleReport] = useState<any | null>(null);
+
+  // Self-Healing state
+  const [isHealing, setIsHealing] = useState<boolean>(false);
+  const [healResult, setHealResult] = useState<any | null>(null);
+
   // Ledger verification state
   const [isVerifyingLedger, setIsVerifyingLedger] = useState<boolean>(false);
   const [ledgerVerification, setLedgerVerification] = useState<{ valid: boolean; message: string } | null>(null);
@@ -122,7 +132,7 @@ export default function ParikshitApp() {
         setHealth(data.data);
       }
 
-      const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
+      const resLedger = await fetch(`${API_BASE}/ledger?limit=20`);
       if (resLedger.ok) {
         const data = await resLedger.json();
         setLedgerEntries(data.data?.entries || []);
@@ -230,7 +240,6 @@ export default function ParikshitApp() {
     }
   };
 
-  // Vibe Coding Actions
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskPrompt.trim() || !currentProject) return;
@@ -308,6 +317,54 @@ export default function ParikshitApp() {
     }
   };
 
+  const handleStartBattle = async () => {
+    if (!currentTask) return;
+    setIsBattling(true);
+    setBattleReport(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${currentTask.task_id}/battles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_rounds: 2 })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setBattleReport(data.data);
+        refreshLedger();
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Battle initialization failed");
+      }
+    } catch (err) {
+      console.error("Battle error:", err);
+    } finally {
+      setIsBattling(false);
+    }
+  };
+
+  const handleSelfHeal = async (runId: string) => {
+    setIsHealing(true);
+    setHealResult(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/runs/${runId}/heal`, {
+        method: "POST"
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setHealResult(data.data);
+        refreshLedger();
+      }
+    } catch (err) {
+      console.error("Self-healing error:", err);
+    } finally {
+      setIsHealing(false);
+    }
+  };
+
   const handleHumanApproval = async (decision: "approved" | "rejected") => {
     if (!currentTask) return;
 
@@ -329,7 +386,7 @@ export default function ParikshitApp() {
   };
 
   const refreshLedger = async () => {
-    const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
+    const resLedger = await fetch(`${API_BASE}/ledger?limit=20`);
     if (resLedger.ok) {
       const ldata = await resLedger.json();
       setLedgerEntries(ldata.data?.entries || []);
@@ -461,9 +518,9 @@ export default function ParikshitApp() {
           </div>
 
           <div className="flex items-center justify-between text-slate-400">
-            <span>Isolation:</span>
-            <span className="text-emerald-400 font-medium text-[11px] flex items-center gap-1">
-              <Lock className="h-3 w-3" /> Workspace Sandboxed
+            <span>Arena Status:</span>
+            <span className="text-cyan-400 font-medium text-[11px] flex items-center gap-1">
+              <Swords className="h-3 w-3" /> Multi-Agent Ready
             </span>
           </div>
         </div>
@@ -475,7 +532,7 @@ export default function ParikshitApp() {
         <header className="h-16 border-b border-slate-800/80 px-8 flex items-center justify-between bg-[#090d16]/70 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-              Sprint 2 • Vibe Coding & QA Active
+              Sprint 3 • AI Battle & Self-Healing Active
             </span>
             <span className="text-slate-500 text-sm">/</span>
             <span className="text-sm text-slate-300 font-medium">Understand → Change → Challenge → Verify → Prove</span>
@@ -505,7 +562,7 @@ export default function ParikshitApp() {
                 <div className="relative z-10 max-w-3xl space-y-3">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Sprints 0 & 1 & 2 Operational
+                    Sprint 3: AI Battle Arena & Self-Healing
                   </div>
                   <h2 className="text-3xl font-extrabold tracking-tight text-white">
                     Move from unfamiliar code to verified, proven changes.
@@ -578,15 +635,15 @@ export default function ParikshitApp() {
                 </div>
 
                 <div
-                  onClick={() => setActiveTab("vibe")}
-                  className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition"
+                  onClick={() => setActiveTab("battle")}
+                  className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-red-500/40 cursor-pointer transition"
                 >
-                  <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-4">
-                    <Hammer className="h-5 w-5" />
+                  <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 mb-4">
+                    <Swords className="h-5 w-5" />
                   </div>
-                  <h4 className="font-semibold text-white text-sm">2. Vibe Coding & QA</h4>
+                  <h4 className="font-semibold text-white text-sm">2. AI vs AI Battle Arena</h4>
                   <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                    Plan generation, isolated workspace checkouts, unified diffs, sandbox test runs, and human approval gates.
+                    Signature multi-agent arena: Builder implements changes, Adversarial QA generates failing edge cases, and Reviewer synthesizes residual risks.
                   </p>
                 </div>
 
@@ -1026,9 +1083,21 @@ export default function ParikshitApp() {
                             Sandbox Test Run: {sandboxResult.exit_code === 0 ? "PASSED (0 errors)" : "FAILED"}
                           </h5>
                         </div>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          Duration: {sandboxResult.duration_ms}ms
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-slate-400">
+                            Duration: {sandboxResult.duration_ms}ms
+                          </span>
+                          {sandboxResult.exit_code !== 0 && (
+                            <button
+                              onClick={() => handleSelfHeal(sandboxResult.run_id)}
+                              disabled={isHealing}
+                              className="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-[11px] flex items-center gap-1 transition"
+                            >
+                              <HeartPulse className="h-3 w-3" />
+                              {isHealing ? "Diagnosing & Healing..." : "Self-Heal Failure"}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
@@ -1046,6 +1115,22 @@ export default function ParikshitApp() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Self-Healing Diagnosis & Verdict Widget */}
+                  {healResult && (
+                    <div className="bg-slate-950/90 border border-amber-500/30 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
+                          <HeartPulse className="h-4 w-4" />
+                          Self-Healing Diagnostic Verdict: {healResult.verdict.toUpperCase()}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400">Attempts: {healResult.attempts_run}</span>
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        {healResult.diagnosis?.hypotheses?.[0]?.description}
+                      </p>
                     </div>
                   )}
 
@@ -1090,47 +1175,95 @@ export default function ParikshitApp() {
           )}
 
           {activeTab === "battle" && (
-            <div className="glass-panel rounded-xl p-8 space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Swords className="h-5 w-5 text-red-400" />
-                    AI vs AI Battle Arena
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Multi-agent adversarial verification loop: Builder vs Adversarial QA vs Reviewer.
-                  </p>
+            <div className="space-y-8">
+              {/* Battle Control Bar */}
+              <div className="glass-panel rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                      <Swords className="h-4 w-4 text-red-400" />
+                      AI vs AI Battle Arena (Signature Feature)
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Multi-agent adversarial verification loop: Builder vs Adversarial QA vs Reviewer.
+                    </p>
+                  </div>
+                  <button
+                    disabled={!currentTask?.patch || isBattling}
+                    onClick={handleStartBattle}
+                    className="bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg shadow-red-600/20 disabled:opacity-50"
+                  >
+                    <Flame className="h-3.5 w-3.5" />
+                    {isBattling ? "Running Battle Arena..." : "Start AI vs AI Battle"}
+                  </button>
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-mono">
-                  Module 4 • Signature Feature
-                </span>
+
+                {!currentTask?.patch && (
+                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-400">
+                    Create and build a task in the <span className="text-indigo-400 font-semibold cursor-pointer" onClick={() => setActiveTab("vibe")}>Vibe Coding</span> tab first to generate a patch for the Battle Arena.
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-slate-950/70 border border-indigo-500/30 rounded-xl p-4 space-y-2">
-                  <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Role 1</span>
-                  <h4 className="font-semibold text-white text-sm">Builder Agent</h4>
-                  <p className="text-xs text-slate-400">
-                    Generates proposed patch in isolated workspace based on user plan.
-                  </p>
-                </div>
+              {/* Battle Results */}
+              {battleReport && (
+                <div className="glass-panel rounded-xl p-6 space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div>
+                      <h4 className="text-base font-bold text-white flex items-center gap-2">
+                        Battle Report: {battleReport.final_verdict.toUpperCase()}
+                      </h4>
+                      <span className="text-xs text-slate-400 font-mono">Battle ID: {battleReport.battle_id}</span>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+                      {battleReport.total_rounds} Rounds Completed
+                    </span>
+                  </div>
 
-                <div className="bg-slate-950/70 border border-red-500/30 rounded-xl p-4 space-y-2">
-                  <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Role 2</span>
-                  <h4 className="font-semibold text-white text-sm">Adversarial QA</h4>
-                  <p className="text-xs text-slate-400">
-                    Actively challenges the patch by generating failing tests, boundary cases, and security vectors.
-                  </p>
-                </div>
+                  {/* Rounds Breakdown */}
+                  <div className="space-y-4">
+                    {battleReport.rounds?.map((rnd: any, i: number) => (
+                      <div key={i} className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-red-400 font-mono">Round {rnd.round_number}: Adversarial QA Challenge</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                            rnd.test_run?.exit_code === 0
+                              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                              : "bg-red-500/10 border-red-500/30 text-red-400"
+                          }`}>
+                            Sandbox Status: {rnd.test_run?.status}
+                          </span>
+                        </div>
 
-                <div className="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-4 space-y-2">
-                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Role 3</span>
-                  <h4 className="font-semibold text-white text-sm">Reviewer Agent</h4>
-                  <p className="text-xs text-slate-400">
-                    Evaluates sandbox test outcomes, synthesizes battle report, and flags residual risks for human approval.
-                  </p>
+                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs space-y-1">
+                          <h5 className="font-semibold text-slate-200">{rnd.adversary_challenge?.challenge_title}</h5>
+                          <p className="text-slate-400 text-[11px]">{rnd.adversary_challenge?.challenge_description}</p>
+                        </div>
+
+                        <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-3 text-xs space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-cyan-400">Reviewer Synthesis:</span>
+                          <p className="text-slate-300 text-[11px]">{rnd.reviewer?.summary}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Residual Risks Breakdown */}
+                  {battleReport.residual_risks?.length > 0 && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-xs space-y-2">
+                      <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                        <AlertTriangle className="h-4 w-4" />
+                        Remaining Residual Risks Flagged for Reviewer:
+                      </span>
+                      <ul className="list-disc list-inside space-y-1 text-slate-300">
+                        {battleReport.residual_risks.map((r: string, idx: number) => (
+                          <li key={idx}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -1147,15 +1280,17 @@ export default function ParikshitApp() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <a
-                    href={`${API_BASE}/ledger/export`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Export Evidence Pack
-                  </a>
+                  {currentTask && (
+                    <a
+                      href={`${API_BASE}/tasks/${currentTask.task_id}/evidence-pack`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download Evidence Pack
+                    </a>
+                  )}
                 </div>
               </div>
 
