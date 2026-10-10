@@ -25,7 +25,12 @@ import {
   Send,
   Code2,
   FolderTree,
-  FileText
+  FileText,
+  Hammer,
+  TestTube2,
+  Check,
+  X,
+  FileDiff
 } from "lucide-react";
 
 interface HealthData {
@@ -73,7 +78,7 @@ interface ComponentItem {
 }
 
 export default function ParikshitApp() {
-  const [activeTab, setActiveTab] = useState<"overview" | "mentor" | "battle" | "ledger">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "mentor" | "vibe" | "battle" | "ledger">("overview");
   const [health, setHealth] = useState<HealthData | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [gitUrl, setGitUrl] = useState<string>("https://github.com/me13krishna/Parikshit");
@@ -89,6 +94,15 @@ export default function ParikshitApp() {
   const [userQuestion, setUserQuestion] = useState<string>("");
   const [isAsking, setIsAsking] = useState<boolean>(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+
+  // Vibe Coding & QA state
+  const [taskPrompt, setTaskPrompt] = useState<string>("Add multiply function to Calculator with unit tests");
+  const [currentTask, setCurrentTask] = useState<any | null>(null);
+  const [isPlanning, setIsPlanning] = useState<boolean>(false);
+  const [isBuilding, setIsBuilding] = useState<boolean>(false);
+  const [isRunningChecks, setIsRunningChecks] = useState<boolean>(false);
+  const [sandboxResult, setSandboxResult] = useState<any | null>(null);
+  const [approvalDecision, setApprovalDecision] = useState<string | null>(null);
 
   // Ledger verification state
   const [isVerifyingLedger, setIsVerifyingLedger] = useState<boolean>(false);
@@ -130,14 +144,12 @@ export default function ParikshitApp() {
 
   const loadProjectDetails = async (projectId: string) => {
     try {
-      // Load overview
       const resOv = await fetch(`${API_BASE}/projects/${projectId}/overview`);
       if (resOv.ok) {
         const data = await resOv.json();
         setOverview(data.data);
       }
 
-      // Load tours
       const resTour = await fetch(`${API_BASE}/projects/${projectId}/tours`);
       if (resTour.ok) {
         const data = await resTour.json();
@@ -152,7 +164,6 @@ export default function ParikshitApp() {
     setIsIngesting(true);
     setIngestSuccess(null);
     try {
-      // Ingest either git or local demo
       const sourceType = gitUrl.startsWith("http") ? "git_url" : "local";
       const res = await fetch(`${API_BASE}/projects/ingest`, {
         method: "POST",
@@ -169,12 +180,7 @@ export default function ParikshitApp() {
         setCurrentProject({ id: data.data.project_id, name: data.data.name });
         setIngestSuccess(`Successfully ingested & indexed ${data.data.file_count} files (${data.data.commit_sha})`);
         loadProjectDetails(data.data.project_id);
-        // Refresh ledger
-        const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
-        if (resLedger.ok) {
-          const ldata = await resLedger.json();
-          setLedgerEntries(ldata.data?.entries || []);
-        }
+        refreshLedger();
       } else {
         const err = await res.json();
         alert(`Ingestion failed: ${err.error?.message || "Unknown error"}`);
@@ -215,17 +221,118 @@ export default function ParikshitApp() {
             uncertainty_notes: data.data.uncertainty_notes
           }
         ]);
-        // Refresh ledger
-        const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
-        if (resLedger.ok) {
-          const ldata = await resLedger.json();
-          setLedgerEntries(ldata.data?.entries || []);
-        }
+        refreshLedger();
       }
     } catch (err) {
       console.error("Mentor chat error:", err);
     } finally {
       setIsAsking(false);
+    }
+  };
+
+  // Vibe Coding Actions
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskPrompt.trim() || !currentProject) return;
+
+    setIsPlanning(true);
+    setSandboxResult(null);
+    setApprovalDecision(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/projects/${currentProject.id}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_text: taskPrompt })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentTask(data.data);
+        refreshLedger();
+      }
+    } catch (err) {
+      console.error("Task planning error:", err);
+    } finally {
+      setIsPlanning(false);
+    }
+  };
+
+  const handleApproveAndBuild = async () => {
+    if (!currentTask) return;
+    setIsBuilding(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${currentTask.task_id}/build`, {
+        method: "POST"
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentTask((prev: any) => ({
+          ...prev,
+          status: "review",
+          workspace_id: data.data.workspace_id,
+          patch: {
+            unified_diff: data.data.unified_diff,
+            files_changed: data.data.files_changed
+          }
+        }));
+        refreshLedger();
+      }
+    } catch (err) {
+      console.error("Build error:", err);
+    } finally {
+      setIsBuilding(false);
+    }
+  };
+
+  const handleRunChecks = async () => {
+    if (!currentTask) return;
+    setIsRunningChecks(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${currentTask.task_id}/run-checks`, {
+        method: "POST"
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSandboxResult(data.data);
+        refreshLedger();
+      }
+    } catch (err) {
+      console.error("Sandbox run error:", err);
+    } finally {
+      setIsRunningChecks(false);
+    }
+  };
+
+  const handleHumanApproval = async (decision: "approved" | "rejected") => {
+    if (!currentTask) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${currentTask.task_id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision })
+      });
+
+      if (res.ok) {
+        setApprovalDecision(decision);
+        setCurrentTask((prev: any) => ({ ...prev, status: decision }));
+        refreshLedger();
+      }
+    } catch (err) {
+      console.error("Approval error:", err);
+    }
+  };
+
+  const refreshLedger = async () => {
+    const resLedger = await fetch(`${API_BASE}/ledger?limit=15`);
+    if (resLedger.ok) {
+      const ldata = await resLedger.json();
+      setLedgerEntries(ldata.data?.entries || []);
     }
   };
 
@@ -297,6 +404,18 @@ export default function ParikshitApp() {
             </button>
 
             <button
+              onClick={() => setActiveTab("vibe")}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "vibe"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              }`}
+            >
+              <Hammer className="h-4 w-4" />
+              Vibe Coding & QA
+            </button>
+
+            <button
               onClick={() => setActiveTab("battle")}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === "battle"
@@ -342,9 +461,9 @@ export default function ParikshitApp() {
           </div>
 
           <div className="flex items-center justify-between text-slate-400">
-            <span>Citation Engine:</span>
+            <span>Isolation:</span>
             <span className="text-emerald-400 font-medium text-[11px] flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" /> Grounded
+              <Lock className="h-3 w-3" /> Workspace Sandboxed
             </span>
           </div>
         </div>
@@ -356,7 +475,7 @@ export default function ParikshitApp() {
         <header className="h-16 border-b border-slate-800/80 px-8 flex items-center justify-between bg-[#090d16]/70 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-              Sprint 1 • Codebase Mentor Live
+              Sprint 2 • Vibe Coding & QA Active
             </span>
             <span className="text-slate-500 text-sm">/</span>
             <span className="text-sm text-slate-300 font-medium">Understand → Change → Challenge → Verify → Prove</span>
@@ -386,7 +505,7 @@ export default function ParikshitApp() {
                 <div className="relative z-10 max-w-3xl space-y-3">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Sprint 1: Codebase Mentor Activated
+                    Sprints 0 & 1 & 2 Operational
                   </div>
                   <h2 className="text-3xl font-extrabold tracking-tight text-white">
                     Move from unfamiliar code to verified, proven changes.
@@ -459,15 +578,15 @@ export default function ParikshitApp() {
                 </div>
 
                 <div
-                  onClick={() => setActiveTab("battle")}
+                  onClick={() => setActiveTab("vibe")}
                   className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition"
                 >
                   <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-4">
-                    <Swords className="h-5 w-5" />
+                    <Hammer className="h-5 w-5" />
                   </div>
-                  <h4 className="font-semibold text-white text-sm">2. AI vs AI Battle</h4>
+                  <h4 className="font-semibold text-white text-sm">2. Vibe Coding & QA</h4>
                   <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                    Signature multi-agent arena: Builder implements changes, Adversarial QA generates failing edge cases, and Reviewer synthesizes residual risks.
+                    Plan generation, isolated workspace checkouts, unified diffs, sandbox test runs, and human approval gates.
                   </p>
                 </div>
 
@@ -759,6 +878,214 @@ export default function ParikshitApp() {
                   </button>
                 </form>
               </div>
+            </div>
+          )}
+
+          {activeTab === "vibe" && (
+            <div className="space-y-8">
+              {/* Task Creation Header */}
+              <div className="glass-panel rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                      <Hammer className="h-4 w-4 text-cyan-400" />
+                      Vibe Coding & Isolated Workspace
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Describe a feature or fix. The Builder plans, forks an isolated checkout, applies changes, and runs sandbox checks.
+                    </p>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+                    Module 2 & 3 • Sprint 2
+                  </span>
+                </div>
+
+                <form onSubmit={handleCreateTask} className="flex gap-3">
+                  <input
+                    type="text"
+                    value={taskPrompt}
+                    onChange={(e) => setTaskPrompt(e.target.value)}
+                    placeholder="e.g. Add multiply function to Calculator with unit tests"
+                    className="flex-1 bg-slate-950/80 border border-slate-700/80 rounded-lg px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isPlanning || !taskPrompt.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {isPlanning ? "Generating Plan..." : "Generate Plan"}
+                  </button>
+                </form>
+              </div>
+
+              {/* Implementation Plan View */}
+              {currentTask?.plan && (
+                <div className="glass-panel rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div>
+                      <h4 className="font-semibold text-white text-sm">Implementation Plan (Review Before Code Generation)</h4>
+                      <p className="text-xs text-slate-400 mt-0.5">{currentTask.plan.summary}</p>
+                    </div>
+                    {currentTask.status === "planning" && (
+                      <button
+                        onClick={handleApproveAndBuild}
+                        disabled={isBuilding}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        {isBuilding ? "Building in Workspace..." : "Approve Plan & Build"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Proposed Plan Steps:</span>
+                      <div className="space-y-1.5 text-xs">
+                        {currentTask.plan.steps?.map((step: any, i: number) => (
+                          <div key={i} className="flex items-start gap-2 text-slate-300">
+                            <span className="h-4 w-4 rounded-full bg-slate-800 text-indigo-400 flex items-center justify-center text-[10px] font-mono mt-0.5">
+                              {step.step}
+                            </span>
+                            <div>
+                              <span className="font-semibold text-slate-200">{step.path}: </span>
+                              {step.description}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Target Files & Testing:</span>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex flex-wrap gap-1.5">
+                          {currentTask.plan.files_affected?.map((f: string, i: number) => (
+                            <span key={i} className="font-mono text-[10px] bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-cyan-300">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-slate-400 text-[11px] pt-1">
+                          Strategy: {currentTask.plan.testing_strategy}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Workspace Diff & Sandbox Run Section */}
+              {currentTask?.patch && (
+                <div className="glass-panel rounded-xl p-6 space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <FileDiff className="h-4 w-4 text-cyan-400" />
+                      <h4 className="font-semibold text-white text-sm">Isolated Workspace Unified Diff</h4>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleRunChecks}
+                        disabled={isRunningChecks}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                      >
+                        <TestTube2 className="h-3.5 w-3.5" />
+                        {isRunningChecks ? "Running Pytest..." : "Run Sandbox Tests"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Unified Diff Display */}
+                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-[11px] overflow-x-auto max-h-80">
+                    <pre className="text-slate-300">
+                      {currentTask.patch.unified_diff.split("\n").map((line: string, idx: number) => (
+                        <div
+                          key={idx}
+                          className={
+                            line.startsWith("+")
+                              ? "bg-emerald-500/10 text-emerald-300 px-1"
+                              : line.startsWith("-")
+                              ? "bg-red-500/10 text-red-300 px-1"
+                              : "text-slate-400 px-1"
+                          }
+                        >
+                          {line}
+                        </div>
+                      ))}
+                    </pre>
+                  </div>
+
+                  {/* Sandbox Run Test Results */}
+                  {sandboxResult && (
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2.5 w-2.5 rounded-full ${sandboxResult.exit_code === 0 ? "bg-emerald-400" : "bg-red-400"}`} />
+                          <h5 className="font-semibold text-white text-xs">
+                            Sandbox Test Run: {sandboxResult.exit_code === 0 ? "PASSED (0 errors)" : "FAILED"}
+                          </h5>
+                        </div>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          Duration: {sandboxResult.duration_ms}ms
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {sandboxResult.tests?.map((t: any, i: number) => (
+                          <div
+                            key={i}
+                            className={`px-2.5 py-1 rounded text-[11px] font-mono border flex items-center gap-1.5 ${
+                              t.outcome === "passed"
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                                : "bg-red-500/10 border-red-500/20 text-red-300"
+                            }`}
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            {t.test_id}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Human Approval Gate */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-200 block">Human Approval Gate</span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        No changes leave the isolated workspace without explicit user authorization.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleHumanApproval("rejected")}
+                        className="px-3.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 flex items-center gap-1.5 transition"
+                      >
+                        <X className="h-3.5 w-3.5" /> Discard
+                      </button>
+                      <button
+                        onClick={() => handleHumanApproval("approved")}
+                        className="px-4 py-1.5 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center gap-1.5 transition"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Approve & Export Patch
+                      </button>
+                    </div>
+                  </div>
+
+                  {approvalDecision && (
+                    <div className={`p-3 rounded-lg text-xs flex items-center gap-2 border ${
+                      approvalDecision === "approved"
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                        : "bg-red-500/10 border-red-500/20 text-red-300"
+                    }`}>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Decision recorded in immutable Proof-of-Work ledger: {approvalDecision.toUpperCase()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

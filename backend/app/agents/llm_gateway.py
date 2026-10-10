@@ -108,6 +108,61 @@ class LLMGateway:
                     }
                 ]
             })
+        elif "file to update" in last_user_msg.lower() or "existing code" in last_user_msg.lower():
+            if "test_" in last_user_msg.lower():
+                mock_content = """```python
+import pytest
+from calculator import Calculator
+
+def test_add():
+    c = Calculator()
+    assert c.add(2, 3) == 5
+
+def test_subtract():
+    c = Calculator()
+    assert c.subtract(5, 2) == 3
+
+def test_divide():
+    c = Calculator()
+    assert c.divide(10, 2) == 5
+
+def test_divide_zero():
+    c = Calculator()
+    with pytest.raises(ValueError):
+        c.divide(10, 0)
+
+def test_multiply():
+    c = Calculator()
+    assert c.multiply(3, 4) == 12
+```"""
+            else:
+                mock_content = """```python
+class Calculator:
+    def __init__(self):
+        self.history = []
+
+    def add(self, a: float, b: float) -> float:
+        res = a + b
+        self.history.append(("add", a, b, res))
+        return res
+
+    def subtract(self, a: float, b: float) -> float:
+        res = a - b
+        self.history.append(("sub", a, b, res))
+        return res
+
+    def divide(self, a: float, b: float) -> float:
+        if b == 0:
+            raise ValueError("Division by zero is not allowed.")
+        res = a / b
+        self.history.append(("div", a, b, res))
+        return res
+
+    def multiply(self, a: float, b: float) -> float:
+        res = a * b
+        self.history.append(("mul", a, b, res))
+        return res
+```"""
         else:
             mock_content = (
                 f"Parikshit Mentor analysis for: '{last_user_msg[:60]}...'\n\n"
