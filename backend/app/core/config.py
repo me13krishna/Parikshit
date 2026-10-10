@@ -1,0 +1,49 @@
+import os
+from pathlib import Path
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    PARIKSHIT_ENV: str = "development"
+    PARIKSHIT_DATA_DIR: str = "./data"
+    PARIKSHIT_DB_URL: str = "sqlite:///./data/parikshit.db"
+    PORT: int = 8000
+    HOST: str = "0.0.0.0"
+
+    # LLM Gateway
+    LLM_PROVIDER: str = "openai"  # openai | anthropic | mock
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    ANTHROPIC_API_KEY: str = ""
+    LLM_DEFAULT_MODEL: str = "gpt-4o-mini"
+    LLM_BUILDER_MODEL: str = "gpt-4o"
+    LLM_ADVERSARY_MODEL: str = "gpt-4o"
+    LLM_REVIEWER_MODEL: str = "gpt-4o-mini"
+    LLM_MAX_TOKENS_PER_SESSION: int = 100000
+    LLM_DAILY_BUDGET_USD: float = 20.00
+
+    # Sandbox
+    SANDBOX_ENABLED: bool = False
+    SANDBOX_IMAGE: str = "parikshit-sandbox:latest"
+    SANDBOX_TIMEOUT_SEC: int = 120
+    SANDBOX_NETWORK: str = "none"
+
+    # Repository Limits
+    MAX_REPO_SIZE_MB: int = 200
+    MAX_FILE_COUNT: int = 3000
+    MAX_FILE_SIZE_MB: int = 5
+    ALLOWED_GIT_HOSTS: str = "github.com,gitlab.com,bitbucket.org"
+
+    # Auth
+    AUTH_DISABLED: bool = True
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore"
+    }
+
+settings = Settings()
+
+# Ensure data directory exists
+data_path = Path(settings.PARIKSHIT_DATA_DIR)
+data_path.mkdir(parents=True, exist_ok=True)
