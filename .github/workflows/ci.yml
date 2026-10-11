@@ -108,3 +108,24 @@ jobs:
           context: ./frontend
           push: false
           tags: parikshit-web:test
+
+  autodeploy:
+    name: Trigger Auto-Deploy
+    needs: [backend-test, frontend-test, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy Hook (if configured)
+        if: env.RENDER_DEPLOY_HOOK != ''
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          echo "Triggering Render deployment webhook..."
+          curl -s -X POST "${RENDER_DEPLOY_HOOK}"
+          echo "Deployment triggered successfully!"
+
+      - name: Deployment Info
+        run: |
+          echo "All CI quality gates passed."
+          echo "Vercel auto-deploys frontend automatically from main branch."
+          echo "Render auto-deploys backend automatically via render.yaml (autoDeploy: true)."

@@ -1,0 +1,33 @@
+name: Keepalive Cron & Health Monitor
+
+on:
+  schedule:
+    # Runs every 12 minutes (Render free tier sleeps after 15 min of inactivity)
+    - cron: '*/12 * * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+concurrency:
+  group: keepalive-cron
+  cancel-in-progress: true
+
+jobs:
+  ping-backend:
+    name: Keep Render Backend Awake
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Parikshit Health Endpoint
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL || secrets.BACKEND_URL }}
+        run: |
+          TARGET_URL="${BACKEND_URL:-https://parikshit-backend.onrender.com}"
+          HEALTH_ENDPOINT="${TARGET_URL%/}/api/v1/health"
+          echo "Pinging health endpoint: ${HEALTH_ENDPOINT}"
+          
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 45 "${HEALTH_ENDPOINT}")
+          echo "HTTP Response Status: ${HTTP_STATUS}"
+          
+          if [ "${HTTP_STATUS}" -eq 200 ]; then
+            echo "✅ Backend is healthy and awake!"
+          else
+            echo "⚠️ Backend responded with status ${HTTP_STATUS} (may be waking up from sleep)"
+          fi
