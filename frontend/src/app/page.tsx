@@ -1,31 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import {
-  ShieldCheck,
   Terminal,
   Swords,
   GitBranch,
   FileCheck2,
-  Cpu,
   Layers,
-  Search,
   ExternalLink,
   CheckCircle2,
   AlertTriangle,
   Play,
-  RotateCcw,
   Download,
   BookOpen,
-  ArrowRight,
-  Database,
-  Lock,
   Sparkles,
   ChevronRight,
   Send,
   Code2,
   FolderTree,
-  FileText,
   Hammer,
   TestTube2,
   Check,
@@ -81,6 +74,146 @@ interface ComponentItem {
   citations?: Citation[];
 }
 
+interface TourStep {
+  step_number: number;
+  title: string;
+  description: string;
+  path: string;
+  start_line?: number;
+  end_line?: number;
+}
+
+interface TourItem {
+  id: string;
+  title: string;
+  description: string;
+  steps: TourStep[];
+}
+
+interface PlanStep {
+  step: number;
+  path: string;
+  description: string;
+}
+
+interface TaskPlan {
+  summary?: string;
+  testing_strategy?: string;
+  steps?: PlanStep[];
+  files_affected?: string[];
+  rationale?: string;
+}
+
+interface TaskItem {
+  task_id: string;
+  project_id: string;
+  status: string;
+  request_text?: string;
+  plan?: TaskPlan;
+  workspace_id?: string;
+  patch?: {
+    id?: string;
+    unified_diff?: string;
+    files_changed?: string[];
+  };
+}
+
+interface TestOutcome {
+  test_id: string;
+  outcome: string;
+  message?: string;
+}
+
+interface SandboxRunResult {
+  run_id: string;
+  workspace_id: string;
+  command: string;
+  exit_code: number;
+  status: string;
+  duration_ms: number;
+  stdout: string;
+  stderr: string;
+  tests: TestOutcome[];
+}
+
+interface BattleRound {
+  round_number: number;
+  builder_patch?: { unified_diff?: string };
+  adversary_challenge?: {
+    challenge_title: string;
+    challenge_description: string;
+    test_code?: string;
+  };
+  test_run?: {
+    run_id: string;
+    exit_code: number;
+    status: string;
+    stdout: string;
+  };
+  reviewer?: {
+    verdict: string;
+    summary: string;
+  };
+}
+
+interface BattleReport {
+  battle_id: string;
+  task_id: string;
+  total_rounds: number;
+  rounds: BattleRound[];
+  residual_risks: string[];
+  final_verdict: string;
+}
+
+interface HealResult {
+  baseline_run_id: string;
+  attempts_run?: number;
+  diagnosis?: {
+    hypotheses?: Array<{ hypothesis?: string; description?: string; confidence: number; fix_strategy?: string }>;
+  };
+  verdict: string;
+  attempts?: Array<{ attempt: number; verdict: string }>;
+}
+
+interface TwinNode {
+  id: string;
+  label: string;
+  path: string;
+  kind: string;
+  language: string;
+  importance: number;
+}
+
+interface TwinEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  label: string;
+}
+
+interface TwinGraphData {
+  project_id: string;
+  revision_id: string;
+  nodes: TwinNode[];
+  edges: TwinEdge[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+interface ImpactComparisonData {
+  task_id: string;
+  predicted_files: string[];
+  actual_files: string[];
+  correctly_predicted: string[];
+  missed_impacts: string[];
+  unmodified_predictions: string[];
+  metrics: {
+    precision: number;
+    recall: number;
+  };
+}
+
 export default function ParikshitApp() {
   const [activeTab, setActiveTab] = useState<"overview" | "mentor" | "vibe" | "battle" | "twin" | "ledger">("overview");
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -92,7 +225,7 @@ export default function ParikshitApp() {
 
   // Mentor state
   const [overview, setOverview] = useState<{ components: ComponentItem[] } | null>(null);
-  const [tours, setTours] = useState<any[]>([]);
+  const [tours, setTours] = useState<TourItem[]>([]);
   const [currentTourStep, setCurrentTourStep] = useState<number>(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userQuestion, setUserQuestion] = useState<string>("");
@@ -101,24 +234,24 @@ export default function ParikshitApp() {
 
   // Vibe Coding & QA state
   const [taskPrompt, setTaskPrompt] = useState<string>("Add multiply function to Calculator with unit tests");
-  const [currentTask, setCurrentTask] = useState<any | null>(null);
+  const [currentTask, setCurrentTask] = useState<TaskItem | null>(null);
   const [isPlanning, setIsPlanning] = useState<boolean>(false);
   const [isBuilding, setIsBuilding] = useState<boolean>(false);
   const [isRunningChecks, setIsRunningChecks] = useState<boolean>(false);
-  const [sandboxResult, setSandboxResult] = useState<any | null>(null);
+  const [sandboxResult, setSandboxResult] = useState<SandboxRunResult | null>(null);
   const [approvalDecision, setApprovalDecision] = useState<string | null>(null);
 
   // Battle Arena state
   const [isBattling, setIsBattling] = useState<boolean>(false);
-  const [battleReport, setBattleReport] = useState<any | null>(null);
+  const [battleReport, setBattleReport] = useState<BattleReport | null>(null);
 
   // Self-Healing state
   const [isHealing, setIsHealing] = useState<boolean>(false);
-  const [healResult, setHealResult] = useState<any | null>(null);
+  const [healResult, setHealResult] = useState<HealResult | null>(null);
 
   // Digital Twin state
-  const [twinGraph, setTwinGraph] = useState<any | null>(null);
-  const [impactData, setImpactData] = useState<any | null>(null);
+  const [twinGraph, setTwinGraph] = useState<TwinGraphData | null>(null);
+  const [impactData, setImpactData] = useState<ImpactComparisonData | null>(null);
   const [isLoadingTwin, setIsLoadingTwin] = useState<boolean>(false);
 
   // Ledger verification state
@@ -127,11 +260,32 @@ export default function ParikshitApp() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
-  useEffect(() => {
-    fetchInitialData();
+  const loadProjectDetails = useCallback(async (projectId: string) => {
+    try {
+      const resOv = await fetch(`${API_BASE}/projects/${projectId}/overview`);
+      if (resOv.ok) {
+        const data = await resOv.json();
+        setOverview(data.data);
+      }
+
+      const resTour = await fetch(`${API_BASE}/projects/${projectId}/tours`);
+      if (resTour.ok) {
+        const data = await resTour.json();
+        setTours(data.data?.tours || []);
+      }
+
+      // Load Digital Twin Graph
+      const resGraph = await fetch(`${API_BASE}/projects/${projectId}/graph`);
+      if (resGraph.ok) {
+        const gdata = await resGraph.json();
+        setTwinGraph(gdata.data);
+      }
+    } catch (err) {
+      console.error("Error loading project details:", err);
+    }
   }, [API_BASE]);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     try {
       const resHealth = await fetch(`${API_BASE}/health`);
       if (resHealth.ok) {
@@ -157,32 +311,12 @@ export default function ParikshitApp() {
     } catch (err) {
       console.warn("Backend connection pending:", err);
     }
-  };
+  }, [API_BASE, loadProjectDetails]);
 
-  const loadProjectDetails = async (projectId: string) => {
-    try {
-      const resOv = await fetch(`${API_BASE}/projects/${projectId}/overview`);
-      if (resOv.ok) {
-        const data = await resOv.json();
-        setOverview(data.data);
-      }
-
-      const resTour = await fetch(`${API_BASE}/projects/${projectId}/tours`);
-      if (resTour.ok) {
-        const data = await resTour.json();
-        setTours(data.data?.tours || []);
-      }
-
-      // Load Digital Twin Graph
-      const resGraph = await fetch(`${API_BASE}/projects/${projectId}/graph`);
-      if (resGraph.ok) {
-        const gdata = await resGraph.json();
-        setTwinGraph(gdata.data);
-      }
-    } catch (err) {
-      console.error("Error loading project details:", err);
-    }
-  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const handleIngest = async () => {
     setIsIngesting(true);
@@ -292,7 +426,7 @@ export default function ParikshitApp() {
 
       if (res.ok) {
         const data = await res.json();
-        setCurrentTask((prev: any) => ({
+        setCurrentTask((prev) => prev ? ({
           ...prev,
           status: "review",
           workspace_id: data.data.workspace_id,
@@ -300,7 +434,7 @@ export default function ParikshitApp() {
             unified_diff: data.data.unified_diff,
             files_changed: data.data.files_changed
           }
-        }));
+        }) : null);
         refreshLedger();
       }
     } catch (err) {
@@ -405,7 +539,7 @@ export default function ParikshitApp() {
 
       if (res.ok) {
         setApprovalDecision(decision);
-        setCurrentTask((prev: any) => ({ ...prev, status: decision }));
+        setCurrentTask((prev) => prev ? ({ ...prev, status: decision }) : null);
         refreshLedger();
       }
     } catch (err) {
@@ -443,8 +577,8 @@ export default function ParikshitApp() {
         <div>
           {/* Logo & Tagline */}
           <div className="flex items-center gap-3 px-2 py-3 mb-6">
-            <div className="h-10 w-10 rounded-xl overflow-hidden ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/20 bg-slate-900 flex-shrink-0">
-              <img src="/logo.jpg" alt="Parikshit Logo" className="h-full w-full object-cover" />
+            <div className="h-10 w-10 rounded-xl overflow-hidden ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/20 bg-slate-900 flex-shrink-0 relative">
+              <Image src="/logo.jpg" alt="Parikshit Logo" width={40} height={40} className="h-full w-full object-cover" priority />
             </div>
             <div>
               <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
@@ -1038,7 +1172,7 @@ export default function ParikshitApp() {
                     <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
                       <span className="text-[10px] uppercase font-bold text-slate-500 block">Proposed Plan Steps:</span>
                       <div className="space-y-1.5 text-xs">
-                        {currentTask.plan.steps?.map((step: any, i: number) => (
+                        {currentTask.plan?.steps?.map((step: PlanStep, i: number) => (
                           <div key={i} className="flex items-start gap-2 text-slate-300">
                             <span className="h-4 w-4 rounded-full bg-slate-800 text-indigo-400 flex items-center justify-center text-[10px] font-mono mt-0.5">
                               {step.step}
@@ -1092,7 +1226,7 @@ export default function ParikshitApp() {
 
                   <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-[11px] overflow-x-auto max-h-80">
                     <pre className="text-slate-300">
-                      {currentTask.patch.unified_diff.split("\n").map((line: string, idx: number) => (
+                      {(currentTask.patch?.unified_diff || "").split("\n").map((line: string, idx: number) => (
                         <div
                           key={idx}
                           className={
@@ -1136,7 +1270,7 @@ export default function ParikshitApp() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {sandboxResult.tests?.map((t: any, i: number) => (
+                        {sandboxResult.tests?.map((t: TestOutcome, i: number) => (
                           <div
                             key={i}
                             className={`px-2.5 py-1 rounded text-[11px] font-mono border flex items-center gap-1.5 ${
@@ -1252,7 +1386,7 @@ export default function ParikshitApp() {
                   </div>
 
                   <div className="space-y-4">
-                    {battleReport.rounds?.map((rnd: any, i: number) => (
+                    {battleReport.rounds?.map((rnd: BattleRound, i: number) => (
                       <div key={i} className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
                         <div className="flex items-center justify-between text-xs font-semibold">
                           <span className="text-red-400 font-mono">Round {rnd.round_number}: Adversarial QA Challenge</span>
@@ -1319,7 +1453,7 @@ export default function ParikshitApp() {
                 <div className="space-y-3">
                   <span className="text-xs font-semibold text-slate-300 block">Repository Modules & Artifacts:</span>
                   <div className="flex flex-wrap gap-2">
-                    {twinGraph?.nodes?.map((node: any) => (
+                    {twinGraph?.nodes?.map((node: TwinNode) => (
                       <div
                         key={node.id}
                         className="bg-slate-950 border border-slate-800 hover:border-cyan-500/40 p-3 rounded-lg text-xs flex items-center gap-3 transition"
@@ -1391,7 +1525,7 @@ export default function ParikshitApp() {
                   </div>
                 ) : (
                   <div className="text-slate-500 text-xs py-2">
-                    Click "Compute Impact Precision" to evaluate graph predictions on the active task.
+                    Click &quot;Compute Impact Precision&quot; to evaluate graph predictions on the active task.
                   </div>
                 )}
               </div>
