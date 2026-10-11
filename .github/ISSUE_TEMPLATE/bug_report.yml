@@ -1,0 +1,40 @@
+name: Bug Report
+description: Create a report to help us fix a bug or security defect
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue! Please provide as much detail as possible.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Steps
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Ingest repository '...'
+        2. Execute task '...'
+        3. Trigger check profile '...'
+    validations:
+      required: true
+  - type: input
+    id: correlation_id
+    attributes:
+      label: Correlation ID / Error Code
+      description: The correlation ID (cid-...) and error code from the API envelope or UI toast.
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Operating Environment
+      options:
+        - Docker Compose
+        - Local Development (Host Runner)
+        - Production Sandbox
+    validations:
+      required: true
