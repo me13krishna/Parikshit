@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 import aiosqlite
 
 from app.core.logging import logger
+from app.core.config import settings
 from app.db.database import get_db_path
 from app.agents.llm_gateway import LLMGateway
 from app.services.retrieval_service import RetrievalService
@@ -147,6 +148,7 @@ Produce JSON strictly adhering to:
             related_ids={"revision_id": revision_id, "artifact_id": artifact_id}
         )
 
+        overview_data["mode"] = "mock" if settings.LLM_PROVIDER == "mock" else "live"
         return overview_data
 
     @classmethod
@@ -229,16 +231,19 @@ Respond strictly in this JSON format:
 
         # CRITICAL: Server-side Citation Verification
         verified_citations = CitationVerifier.verify_citations(
-            storage_path, ans_data.get("citations", [])
+            storage_path, ans_data.get("citations", []), expected_commit_sha=rev["commit_sha"]
         )
 
-        # If zero citations passed and it was supposed to be grounded, adjust status
         valid_count = sum(1 for c in verified_citations if c.get("verified"))
-        if valid_count == 0 and ans_data.get("status") == "grounded":
+        if valid_count == 0:
+            ans_data["status"] = "ungrounded"
+            ans_data["uncertainty_notes"] = "Zero citations could be verified against repository files on disk."
+        elif valid_count < len(verified_citations):
             ans_data["status"] = "partially_grounded"
-            ans_data["uncertainty_notes"] = "Citations could not be verified against the physical disk repository."
+            ans_data["uncertainty_notes"] = "Some cited lines or paths could not be verified on disk."
 
         ans_data["citations"] = verified_citations
+        ans_data["mode"] = "mock" if settings.LLM_PROVIDER == "mock" else "live"
 
         # Persist conversation and message
         conv_id = conversation_id or f"cnv_{uuid.uuid4().hex[:12]}"

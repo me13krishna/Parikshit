@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 import aiosqlite
 
 from app.core.logging import logger
+from app.core.config import settings
 from app.core.errors import AppError
 from app.db.database import get_db_path
 from app.agents.llm_gateway import LLMGateway
@@ -75,14 +76,31 @@ class BattleService:
 
         logger.info(f"Starting AI vs AI Battle {battle_id} on task {task_id} (max_rounds={max_rounds})...")
 
+        files_changed = json.loads(patch["files_changed"]) if ("files_changed" in patch.keys() and patch["files_changed"]) else []
+        import_lines = ["import pytest"]
+        for f in files_changed:
+            stem = Path(f).stem
+            if not stem.startswith("test_") and stem != "__init__":
+                import_lines.append(f"import {stem}")
+        if len(import_lines) == 1 and (workspace_dir / "calculator.py").exists():
+            import_lines.append("from calculator import Calculator")
+        module_import_header = "\n".join(import_lines) + "\n\n"
+
         for round_num in range(1, max_rounds + 1):
             round_id = f"rnd_{uuid.uuid4().hex[:12]}"
             round_now = datetime.now(timezone.utc).isoformat()
 
             # 1. Adversarial QA: Generate Challenge & Tests
+            history_context = ""
+            if all_challenges:
+                history_context = "\nPreviously run challenges (DO NOT duplicate):\n" + "\n".join(
+                    f"- Round {c.get('round', i+1)}: {c.get('challenge_title')}" for i, c in enumerate(all_challenges)
+                )
+
             adversary_prompt = f"""
 You are the ADVERSARIAL QA ENGINEER. Your mission is to rigorously CHALLENGE the Builder's work.
 You MUST NOT simply agree. Identify edge cases, boundary conditions (zero, negative, float precision, empty lists, extreme inputs).
+{history_context}
 
 Builder's Patch Diff:
 ```diff
@@ -100,11 +118,11 @@ Produce JSON:
 }}
 """
             messages = [
-                {"role": "system", "content": "You are the Parikshit Adversarial QA Engineer. Find vulnerabilities and edge cases."},
+                {"role": "system", "content": LLMGateway.get_system_prompt("adversary")},
                 {"role": "user", "content": adversary_prompt}
             ]
 
-            llm_res = await LLMGateway.generate_chat(messages, temperature=0.3)
+            llm_res = await LLMGateway.generate_chat(messages, role="adversary", temperature=0.3)
             raw = llm_res["content"].strip()
 
             try:
@@ -115,25 +133,43 @@ Produce JSON:
                     clean = clean.split("```")[1].split("```")[0].strip()
                 adv_data = json.loads(clean)
             except Exception:
-                # Deterministic adversarial challenge fallback
-                adv_data = {
-                    "challenge_title": f"Boundary condition check round {round_num}",
-                    "challenge_description": "Validates boundary precision and unexpected zero/negative operations.",
-                    "severity": "medium",
-                    "test_code": f"""
-def test_adversarial_edge_case_r{round_num}():
-    c = Calculator()
-    # Test extreme values and history tracking
-    res = c.add(1e6, -1e6)
-    assert res == 0
-"""
-                }
+                if settings.LLM_PROVIDER != "mock":
+                    raise AppError(f"Adversary agent output failed to parse: {raw}", code="ADVERSARY_PARSE_ERROR")
+                if (workspace_dir / "calculator.py").exists():
+                    r_tests = {
+                        1: ("Boundary Zero & Negative Addition", "c = Calculator()\n    assert c.add(-100, 100) == 0", "low"),
+                        2: ("Division by Zero Exception", "c = Calculator()\n    with pytest.raises(ValueError):\n        c.divide(10, 0)", "high"),
+                        3: ("Precision and Multiplication Stress", "c = Calculator()\n    assert c.multiply(0.5, 2.0) == 1.0", "medium")
+                    }
+                    title, code, sev = r_tests.get(round_num, ("General Boundary Test", "assert True", "low"))
+                    adv_data = {
+                        "challenge_title": f"Round {round_num}: {title}",
+                        "challenge_description": f"Validates {title.lower()} behavior.",
+                        "severity": sev,
+                        "test_code": f"def test_adversarial_challenge_r{round_num}():\n    {code}\n"
+                    }
+                else:
+                    adv_data = {
+                        "challenge_title": f"Round {round_num}: Boundary & Invariant Check",
+                        "challenge_description": "Validates boundary precision and unexpected zero/negative operations.",
+                        "severity": "medium",
+                        "test_code": f"def test_adversarial_challenge_r{round_num}():\n    assert True\n"
+                    }
 
+            adv_data["round"] = round_num
+            adv_data["challenge_title"] = adv_data.get("challenge_title") or adv_data.get("title") or f"Round {round_num}: Adversarial Challenge"
+            adv_data["challenge_description"] = adv_data.get("challenge_description") or adv_data.get("description") or "Validates boundary precision and edge cases."
+            adv_data["title"] = adv_data["challenge_title"]
+            adv_data["description"] = adv_data["challenge_description"]
             all_challenges.append(adv_data)
 
             # Write adversary test to workspace
             adv_test_file = workspace_dir / f"test_adversary_r{round_num}.py"
-            adv_test_content = f"import pytest\nfrom calculator import Calculator\n\n{adv_data.get('test_code', '')}\n"
+            test_body = adv_data.get('test_code', '')
+            if "import " not in test_body:
+                adv_test_content = f"{module_import_header}{test_body}\n"
+            else:
+                adv_test_content = f"import pytest\n{test_body}\n"
             adv_test_file.write_text(adv_test_content, encoding="utf-8")
 
             # 2. Execute Sandbox checks
@@ -154,11 +190,11 @@ Produce JSON:
 }}
 """
             rev_messages = [
-                {"role": "system", "content": "You are the Parikshit Reviewer Agent. Impartial, evidence-based synthesizer."},
+                {"role": "system", "content": LLMGateway.get_system_prompt("reviewer")},
                 {"role": "user", "content": reviewer_prompt}
             ]
 
-            rev_res = await LLMGateway.generate_chat(rev_messages, temperature=0.1)
+            rev_res = await LLMGateway.generate_chat(rev_messages, role="reviewer", temperature=0.1)
             try:
                 rclean = rev_res["content"].strip()
                 if "```json" in rclean:
@@ -167,9 +203,11 @@ Produce JSON:
                     rclean = rclean.split("```")[1].split("```")[0].strip()
                 rev_data = json.loads(rclean)
             except Exception:
+                if settings.LLM_PROVIDER != "mock":
+                    raise AppError(f"Reviewer output failed to parse: {rev_res['content']}", code="REVIEWER_PARSE_ERROR")
                 rev_data = {
-                    "summary": f"Round {round_num}: Adversarial challenge executed in sandbox with status {sandbox_run['status']}.",
-                    "residual_risks": ["Potential precision loss on floating point edge cases."],
+                    "summary": f"Round {round_num}: Adversarial challenge executed with status {sandbox_run['status']}.",
+                    "residual_risks": ["Potential edge boundary risk if invalid types passed."],
                     "verdict": "passed_cleanly" if sandbox_run["exit_code"] == 0 else "needs_rework"
                 }
 
@@ -248,7 +286,8 @@ Produce JSON:
             "rounds": rounds_summary,
             "challenges_raised": all_challenges,
             "residual_risks": list(set(all_residual_risks)),
-            "final_verdict": final_verdict
+            "final_verdict": final_verdict,
+            "mode": "mock" if settings.LLM_PROVIDER == "mock" else "live"
         }
 
         # Final battle ledger entry

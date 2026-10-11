@@ -120,6 +120,51 @@ async def record_approval(task_id: str, req: ApprovalRequest):
     result = await TaskService.record_human_approval(task_id, req.decision)
     return success_response(result)
 
+@router.post("/tasks/{task_id}/export")
+async def export_task_patch(task_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        t_cursor = await db.execute("SELECT * FROM tasks WHERE id = ?;", (task_id,))
+        task = await t_cursor.fetchone()
+        if not task:
+            return error_response(f"Task {task_id} not found", code="TASK_NOT_FOUND", status_code=404)
+
+        p_cursor = await db.execute(
+            """
+            SELECT p.* FROM patches p
+            JOIN workspaces w ON p.workspace_id = w.id
+            WHERE w.task_id = ?
+            ORDER BY p.created_at DESC LIMIT 1;
+            """,
+            (task_id,)
+        )
+        patch = await p_cursor.fetchone()
+        if not patch:
+            return error_response("No patch generated for this task", code="NO_PATCH_FOUND", status_code=404)
+
+        a_cursor = await db.execute(
+            "SELECT * FROM approvals WHERE target_id = ? AND decision = 'approved' ORDER BY decided_at DESC LIMIT 1;",
+            (task_id,)
+        )
+        approval = await a_cursor.fetchone()
+        if not approval or task["status"] != "approved":
+            return error_response(
+                "Export rejected: human approval is required before exporting or applying patch",
+                code="APPROVAL_REQUIRED",
+                status_code=403
+            )
+
+    return success_response({
+        "task_id": task_id,
+        "patch_id": patch["id"],
+        "unified_diff": patch["unified_diff"],
+        "files_changed": json.loads(patch["files_changed"]),
+        "approved_at": approval["decided_at"],
+        "approved_by": approval["actor"],
+        "status": "exported"
+    })
+
 @router.get("/tasks/{task_id}/diff")
 async def get_task_diff(task_id: str):
     db_path = get_db_path()

@@ -250,7 +250,7 @@ CREATE TABLE IF NOT EXISTS repair_attempts (
     diagnosis TEXT NOT NULL,
     patch_id TEXT,
     verification_run_id TEXT,
-    verdict TEXT CHECK (verdict IN ('verified_fix', 'attempted_fix', 'unverified', 'failed', 'inconclusive')),
+    verdict TEXT CHECK (verdict IN ('verified_fix', 'attempted_fix', 'unverified', 'failed', 'inconclusive', 'FIXED', 'PARTIALLY_FIXED', 'NOT_FIXED', 'UNSAFE_TO_AUTO_FIX')),
     created_at TEXT NOT NULL
 );
 
@@ -285,6 +285,17 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at TEXT NOT NULL,
     started_at TEXT,
     finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id TEXT PRIMARY KEY,
+    session_id TEXT,
+    model TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    estimated_cost_usd REAL NOT NULL,
+    created_at TEXT NOT NULL
 );
 
 -- Indexes for performance

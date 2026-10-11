@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 import aiosqlite
 
+from app.core.config import settings
 from app.core.logging import logger
 from app.core.errors import AppError
 from app.db.database import get_db_path
@@ -25,13 +26,14 @@ class TaskService:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
-                "SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
+                "SELECT id, storage_path FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
                 (project_id,)
             )
             rev = await cursor.fetchone()
             if not rev:
                 raise AppError("No indexed revision found for project", code="NOT_FOUND")
             revision_id = rev["id"]
+            storage_path = rev["storage_path"]
 
         task_id = f"tsk_{uuid.uuid4().hex[:12]}"
         plan_id = f"pln_{uuid.uuid4().hex[:12]}"
@@ -74,8 +76,12 @@ Create an engineering implementation plan in JSON:
                 clean = clean.split("```")[1].split("```")[0].strip()
             plan_data = json.loads(clean)
         except Exception:
-            # Deterministic plan fallback
-            affected = [c["path"] for c in context_chunks] or ["calculator.py", "test_calculator.py"]
+            if settings.LLM_PROVIDER != "mock":
+                raise AppError(f"Planning failed to produce structured plan: {raw}", code="PLANNING_FAILED")
+            affected = [c["path"] for c in context_chunks]
+            if not affected:
+                py_files = list(Path(storage_path).glob("*.py"))
+                affected = [str(f.name) for f in py_files[:2]] if py_files else ["main.py", "test_main.py"]
             plan_data = {
                 "summary": f"Implement requested changes: {request_text}",
                 "files_affected": affected,
@@ -182,7 +188,7 @@ Return ONLY code inside a single ```python (or matching language) block.
                 {"role": "user", "content": prompt}
             ]
 
-            llm_res = await LLMGateway.generate_chat(messages, temperature=0.2)
+            llm_res = await LLMGateway.generate_chat(messages, role="builder", temperature=0.2)
             content = llm_res["content"]
 
             if "```" in content:
@@ -196,22 +202,34 @@ Return ONLY code inside a single ```python (or matching language) block.
 
             files_to_update[file_rel] = clean_code
 
-        # If LLM generated nothing (e.g. mock fallback), apply clean programmatic changes
+        # If LLM generated nothing
         if not files_to_update or all(not v.strip() for v in files_to_update.values()):
-            # Fallback demonstration modification
+            if settings.LLM_PROVIDER != "mock":
+                raise AppError(
+                    "Builder LLM failed to produce valid code changes",
+                    code="BUILDER_EMPTY_RESPONSE"
+                )
+            # In explicit mock mode:
             calc_f = workspace_dir / "calculator.py"
+            test_f = workspace_dir / "test_calculator.py"
             if calc_f.is_file():
                 calc_code = calc_f.read_text(encoding="utf-8")
                 if "def multiply" not in calc_code:
                     calc_code += "\n    def multiply(self, a: float, b: float) -> float:\n        res = a * b\n        self.history.append(('mul', a, b, res))\n        return res\n"
                     files_to_update["calculator.py"] = calc_code
-
-            test_f = workspace_dir / "test_calculator.py"
-            if test_f.is_file():
-                test_code = test_f.read_text(encoding="utf-8")
-                if "test_multiply" not in test_code:
-                    test_code += "\ndef test_multiply():\n    c = Calculator()\n    assert c.multiply(3, 4) == 12\n"
-                    files_to_update["test_calculator.py"] = test_code
+                if test_f.is_file():
+                    test_code = test_f.read_text(encoding="utf-8")
+                    if "test_multiply" not in test_code:
+                        test_code += "\ndef test_multiply():\n    c = Calculator()\n    assert c.multiply(3, 4) == 12\n"
+                        files_to_update["test_calculator.py"] = test_code
+            else:
+                py_files = list(workspace_dir.glob("*.py")) + list(workspace_dir.glob("*/*.py"))
+                src_files = [f for f in py_files if not f.name.startswith("test_")]
+                if src_files:
+                    target_file = src_files[0]
+                    rel_p = str(target_file.relative_to(workspace_dir)).replace("\\", "/")
+                    old_text = target_file.read_text(encoding="utf-8")
+                    files_to_update[rel_p] = old_text + f"\n# Automated fix applied by Parikshit Builder: {task['request_text']}\n"
 
         # 3. Apply changes inside workspace
         patch_res = await WorkspaceService.apply_file_changes(workspace_id, files_to_update, agent_role="builder")

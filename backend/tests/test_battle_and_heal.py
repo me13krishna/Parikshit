@@ -69,7 +69,7 @@ async def test_sprint3_battle_and_evidence():
     heal_res = await SelfHealingService.heal_failure(actual_fail_run["run_id"], max_attempts=2)
     assert heal_res["baseline_run_id"] == actual_fail_run["run_id"]
     assert "diagnosis" in heal_res
-    assert heal_res["verdict"] in ["verified_fix", "attempted_fix", "failed"]
+    assert heal_res["verdict"] in ["FIXED", "PARTIALLY_FIXED", "NOT_FIXED", "UNSAFE_TO_AUTO_FIX", "verified_fix", "attempted_fix", "failed"]
 
     # 5. Full Cryptographic Evidence Pack & Ledger Integrity
     chain_status = await LedgerService.verify_chain(project_id=project_id)

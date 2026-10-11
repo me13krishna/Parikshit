@@ -142,8 +142,11 @@ Produce JSON:
                 clean = clean.split("```")[1].split("```")[0].strip()
             prediction = json.loads(clean)
         except Exception:
+            source_files = [f for f in file_paths if f.endswith(".py") and not f.startswith("test_")]
+            test_files = [f for f in file_paths if f.startswith("test_") or "test" in f]
+            predicted = (source_files[:1] + test_files[:1]) if source_files else file_paths[:2]
             prediction = {
-                "predicted_files": [f for f in file_paths if "calculator" in f][:2],
+                "predicted_files": predicted,
                 "rationale": "Direct module modification and corresponding test coverage file.",
                 "risk_assessment": "low"
             }
