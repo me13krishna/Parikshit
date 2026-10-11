@@ -6,7 +6,7 @@ from app.services.ledger_service import LedgerService
 router = APIRouter(tags=["Ledger"])
 
 @router.get("/ledger")
-async def get_ledger_entries(
+async def get_ledger_summary(
     project_id: Optional[str] = Query(None, description="Optional project ID to filter by"),
     limit: int = Query(50, ge=1, le=200)
 ):
@@ -16,12 +16,21 @@ async def get_ledger_entries(
         "count": len(entries)
     })
 
+@router.get("/ledger/entries")
+async def get_ledger_entries(
+    project_id: Optional[str] = Query(None, description="Optional project ID to filter by"),
+    limit: int = Query(50, ge=1, le=200)
+):
+    entries = await LedgerService.list_entries(project_id=project_id, limit=limit)
+    return success_response(entries)
+
 @router.get("/ledger/verify")
 async def verify_ledger(project_id: Optional[str] = None):
     result = await LedgerService.verify_chain(project_id=project_id)
     return success_response(result)
 
 @router.get("/ledger/export")
+@router.get("/ledger/evidence-pack")
 async def export_evidence_pack(project_id: Optional[str] = None):
     pack = await LedgerService.export_evidence_pack(project_id=project_id)
     return success_response(pack)

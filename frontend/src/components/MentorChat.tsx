@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Send, CheckCircle2, AlertTriangle, BookOpen, Loader2 } from "lucide-react";
+import { Send, CheckCircle2, AlertTriangle, BookOpen, Loader2, MessageSquareCode } from "lucide-react";
 import { ChatMessage, Citation } from "../lib/types";
 import { api, ApiClientError } from "../lib/api";
 
@@ -16,10 +16,11 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
     {
       id: "initial",
       role: "assistant",
-      content: "Hello! I am your Parikshit Grounded Mentor. Ask me anything about this repository. Every claim I make is verified against AST nodes and file lines.",
+      content:
+        "Welcome to Codebase Mentor. I answer architectural questions and explain invariants with verified AST grounding. Every statement is verified against indexed repository lines.",
       grounded: true,
-      citations: []
-    }
+      citations: [],
+    },
   ]);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -35,7 +36,7 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
       id: `usr_${Date.now()}`,
       role: "user",
       content: userText,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
@@ -51,18 +52,20 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
         grounded: res.grounded,
         citations: res.citations as Citation[],
         uncertainty_notes: res.uncertainty_notes,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
         onError(err);
       } else {
-        onError(new ApiClientError({
-          message: err instanceof Error ? err.message : "Failed to get Mentor answer",
-          code: "MENTOR_QUERY_ERROR",
-          status_code: 500
-        }));
+        onError(
+          new ApiClientError({
+            message: err instanceof Error ? err.message : "Failed to obtain mentor answer",
+            code: "MENTOR_QUERY_ERROR",
+            status_code: 500,
+          })
+        );
       }
     } finally {
       setLoading(false);
@@ -70,15 +73,37 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
   };
 
   const quickPrompts = [
-    "What are the core components and duties in this service?",
-    "Where is error handling or division by zero handled?",
-    "Explain how tests are organized in this codebase."
+    "What are the core classes and calculation methods?",
+    "Where is error handling or division by zero implemented?",
+    "How are unit tests structured in this repository?",
   ];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-4xl mx-auto p-4">
-      {/* Message History */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-w-4xl mx-auto space-y-3">
+      {/* Header Context */}
+      <div className="flex items-center justify-between pb-3 border-b border-[rgba(159,176,204,0.12)]">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-[rgba(45,212,192,0.1)] text-[var(--color-teal-400)]">
+            <MessageSquareCode className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold text-[var(--color-text-100)] font-display">
+              Stage 1: Understand
+            </h2>
+            <p className="text-[11px] text-[var(--color-text-500)]">
+              Grounded codebase mentor with verified AST citations
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--color-text-300)] bg-[var(--color-ink-900)] px-2.5 py-1 rounded-md border border-[rgba(159,176,204,0.14)]">
+          <span className="w-2 h-2 rounded-full bg-[var(--color-teal-400)]" />
+          <span>AST Index Active</span>
+        </div>
+      </div>
+
+      {/* Message Stream */}
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
         {messages.map((msg, i) => (
           <div
             key={msg.id || i}
@@ -87,22 +112,22 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
             }`}
           >
             <div
-              className={`max-w-[85%] rounded-xl p-4 text-xs leading-relaxed shadow-sm ${
+              className={`max-w-[88%] rounded-2xl p-4 text-xs leading-relaxed shadow-md ${
                 msg.role === "user"
-                  ? "bg-cyan-600 text-white font-medium"
-                  : "bg-zinc-900 border border-zinc-800 text-zinc-200"
+                  ? "bg-[var(--color-blue-500)] text-white font-medium"
+                  : "bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.16)] text-[var(--color-text-100)] border-active-top"
               }`}
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
 
-              {/* Grounding & Citations */}
+              {/* Grounded Citations & Status */}
               {msg.role === "assistant" && (
-                <div className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center gap-2">
+                <div className="mt-3 pt-3 border-t border-[rgba(159,176,204,0.12)] flex flex-wrap items-center gap-2">
                   <div
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
                       msg.grounded
-                        ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/40"
-                        : "bg-amber-950/60 text-amber-400 border-amber-800/40"
+                        ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/40"
+                        : "bg-amber-950/40 text-amber-300 border-amber-800/40"
                     }`}
                   >
                     {msg.grounded ? (
@@ -110,7 +135,7 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
                     ) : (
                       <AlertTriangle className="w-3 h-3 text-amber-400" />
                     )}
-                    <span>{msg.grounded ? "Grounded Answer" : "Ungrounded Claims Flagged"}</span>
+                    <span>{msg.grounded ? "AST Verified Grounding" : "Unverified Claims Flagged"}</span>
                   </div>
 
                   {/* Citation pills */}
@@ -120,12 +145,12 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
                         <button
                           key={ci}
                           onClick={() => onSelectCitation(c)}
-                          className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-cyan-300 border border-zinc-700 text-[11px] font-mono transition-colors flex items-center gap-1"
-                          title={`Click to view snippet: ${c.path}:${c.start_line}-${c.end_line}`}
+                          className="px-2 py-0.5 rounded-md bg-[var(--color-ink-800)] hover:bg-[var(--color-ink-950)] text-[var(--color-cyan-300)] border border-[rgba(106,215,250,0.3)] text-[11px] font-mono transition-colors flex items-center gap-1.5 shadow-sm"
+                          title={`Inspect snippet in ${c.path}:${c.start_line}-${c.end_line}`}
                         >
-                          <BookOpen className="w-3 h-3 text-cyan-400" />
+                          <BookOpen className="w-3 h-3 text-[var(--color-cyan-300)]" />
                           <span>
-                            {c.path.split("/").pop()}:{c.start_line}
+                            {c.path.split("/").pop()}:{c.start_line}–{c.end_line}
                           </span>
                         </button>
                       ))}
@@ -135,49 +160,53 @@ export const MentorChat: React.FC<MentorChatProps> = ({ revisionId, onSelectCita
               )}
 
               {msg.uncertainty_notes && (
-                <div className="mt-2 text-[10px] text-amber-300/80 italic font-mono">
+                <div className="mt-2 text-[11px] text-amber-300/90 font-mono italic">
                   Note: {msg.uncertainty_notes}
                 </div>
               )}
             </div>
-            <span className="text-[10px] text-zinc-500 px-1 font-mono">{msg.timestamp}</span>
+
+            <span className="text-[10px] text-[var(--color-text-500)] px-1 font-mono">
+              {msg.timestamp}
+            </span>
           </div>
         ))}
 
         {loading && (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs max-w-xs animate-pulse">
-            <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
-            <span>Consulting AST & verifying citations...</span>
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.14)] text-[var(--color-text-300)] text-xs max-w-sm animate-pulse">
+            <Loader2 className="w-4 h-4 text-[var(--color-cyan-300)] animate-spin" />
+            <span>Consulting AST syntax trees and extracting line citations...</span>
           </div>
         )}
       </div>
 
-      {/* Quick Prompts */}
-      <div className="py-2 flex items-center gap-2 overflow-x-auto">
+      {/* Suggested Quick Prompts */}
+      <div className="py-1 flex items-center gap-2 overflow-x-auto">
+        <span className="text-[10px] text-[var(--color-text-500)] font-mono shrink-0">Try:</span>
         {quickPrompts.map((p, idx) => (
           <button
             key={idx}
             onClick={() => setInput(p)}
-            className="px-2.5 py-1 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 text-[11px] truncate shrink-0 transition-colors"
+            className="px-3 py-1 rounded-full bg-[var(--color-ink-900)] hover:bg-[var(--color-ink-800)] border border-[rgba(159,176,204,0.14)] text-[var(--color-text-300)] hover:text-[var(--color-text-100)] text-[11px] truncate shrink-0 transition-colors"
           >
             {p}
           </button>
         ))}
       </div>
 
-      {/* Input box */}
-      <form onSubmit={handleSend} className="pt-2 flex items-center gap-2">
+      {/* User Input Form */}
+      <form onSubmit={handleSend} className="pt-1 flex items-center gap-2">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a question about components, methods, or invariants..."
-          className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-sans"
+          placeholder="Ask a question about classes, functions, or invariants in this project..."
+          className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.18)] text-[var(--color-text-100)] text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-300)] placeholder-[var(--color-text-500)] font-sans"
         />
         <button
           type="submit"
           disabled={!input.trim() || loading}
-          className="px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm shadow-cyan-950/40"
+          className="px-4 py-2.5 rounded-xl bg-[var(--color-blue-500)] hover:bg-[var(--color-sky-400)] disabled:bg-[var(--color-ink-800)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-[rgba(7,108,211,0.3)] shrink-0"
         >
           <Send className="w-3.5 h-3.5" />
           <span>Ask</span>

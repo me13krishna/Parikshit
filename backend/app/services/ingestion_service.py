@@ -45,10 +45,12 @@ class IngestionService:
 
         logger.info(f"Ingesting project {project_name} from {source_uri} (type: {source_type}) into {dest_dir}...")
 
+        norm_type = "git_url" if source_type in ["git", "git_url"] else source_type
+
         commit_sha = "local_head"
-        if source_type == "git_url":
+        if norm_type == "git_url":
             commit_sha = await asyncio.to_thread(cls._clone_git, source_uri, dest_dir)
-        elif source_type in ["local", "zip"]:
+        elif norm_type in ["local", "zip"]:
             commit_sha = await asyncio.to_thread(cls._copy_local, source_uri, dest_dir)
         else:
             raise AppError(f"Unsupported source type: {source_type}", code="INVALID_SOURCE_TYPE")
@@ -80,7 +82,7 @@ class IngestionService:
                 INSERT INTO projects (id, name, source_type, source_uri, created_at, status)
                 VALUES (?, ?, ?, ?, ?, 'active');
                 """,
-                (project_id, project_name, source_type, source_uri, now_iso)
+                (project_id, project_name, norm_type, source_uri, now_iso)
             )
 
             await db.execute(

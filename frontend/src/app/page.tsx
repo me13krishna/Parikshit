@@ -11,6 +11,8 @@ import { TaskPlanner } from "../components/TaskPlanner";
 import { BattleReport } from "../components/BattleReport";
 import { TwinGraph } from "../components/TwinGraph";
 import { LedgerTimeline } from "../components/LedgerTimeline";
+import { CommandPalette } from "../components/CommandPalette";
+import { PipelineStage } from "../components/PipelineOrbit";
 import { HealthData, Citation, LedgerVerifyResult } from "../lib/types";
 import { api, ApiClientError } from "../lib/api";
 
@@ -23,9 +25,20 @@ export default function ParikshitCockpit() {
   const [taskId, setTaskId] = useState<string>("");
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
   const [ledgerStatus, setLedgerStatus] = useState<LedgerVerifyResult | null>(null);
-  const [activeError, setActiveError] = useState<{ message: string; code?: string; correlationId?: string } | null>(null);
+  const [activeError, setActiveError] = useState<{
+    message: string;
+    code?: string;
+    correlationId?: string;
+    fixAdvice?: string;
+  } | null>(null);
 
-  // Poll system health and ledger verification
+  // Command palette state
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
+
+  // Completed lifecycle stages tracking
+  const [completedStages, setCompletedStages] = useState<PipelineStage[]>([]);
+
+  // Telemetry poller
   const loadSystemTelemetry = useCallback(async () => {
     try {
       const h = await api.getHealth();
@@ -37,7 +50,7 @@ export default function ParikshitCockpit() {
         setActiveError({
           message: err.message,
           code: err.code,
-          correlationId: err.correlationId
+          correlationId: err.correlationId,
         });
       }
     }
@@ -56,7 +69,7 @@ export default function ParikshitCockpit() {
           setActiveError({
             message: err.message,
             code: err.code,
-            correlationId: err.correlationId
+            correlationId: err.correlationId,
           });
         }
       }
@@ -67,10 +80,27 @@ export default function ParikshitCockpit() {
     };
   }, []);
 
-  const handleIngestSuccess = (project: { project_id: string; default_revision_id: string; name: string }) => {
+  // Keyboard shortcut listener for Ctrl+K / Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleIngestSuccess = (project: {
+    project_id: string;
+    default_revision_id: string;
+    name: string;
+  }) => {
     setProjectId(project.project_id);
     setRevisionId(project.default_revision_id);
     setProjectName(project.name);
+    setCompletedStages((prev) => Array.from(new Set([...prev, "mentor"])));
     setActiveTab("mentor");
     loadSystemTelemetry();
   };
@@ -79,13 +109,19 @@ export default function ParikshitCockpit() {
     setActiveError({
       message: err.message,
       code: err.code,
-      correlationId: err.correlationId
+      correlationId: err.correlationId,
+      fixAdvice:
+        err.statusCode === 404
+          ? "Resource not found. Try re-ingesting or verifying database migrations."
+          : err.statusCode === 500
+          ? "Backend internal error. Check correlation ID in server logs."
+          : "Verify parameter schema and retry request.",
     });
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* System Banner (Mock Warning, Unsandboxed Badge, Error Toast) */}
+    <div className="min-h-screen bg-[var(--color-ink-950)] text-[var(--color-text-100)] flex flex-col font-sans selection:bg-[var(--color-cyan-300)]/20 selection:text-[var(--color-cyan-300)]">
+      {/* System Banner (Mock Warning, Unsandboxed Notice, Error Toast) */}
       <Banner
         health={health}
         error={activeError}
@@ -98,18 +134,35 @@ export default function ParikshitCockpit() {
         projectName={projectName}
         revisionId={revisionId}
         ledgerStatus={ledgerStatus}
+        activeStage={activeTab === "ingest" ? "overview" : (activeTab as PipelineStage)}
+        completedStages={completedStages}
+        onSelectStage={(stage) => setActiveTab(stage as NavTab)}
         onRefreshHealth={loadSystemTelemetry}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       />
 
       {/* Main Cockpit Body */}
       <div className="flex-1 flex overflow-hidden">
         {/* Navigation Sidebar */}
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          projectName={projectName}
+          revisionId={revisionId}
+        />
 
         {/* Dynamic Workspace Panel */}
-        <main className="flex-1 overflow-y-auto bg-zinc-950/40 p-2 sm:p-4 md:p-6">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-8 pb-16 md:pb-8 outline-none"
+        >
           {activeTab === "ingest" && (
-            <ProjectIngest onIngestSuccess={handleIngestSuccess} onError={handleError} />
+            <ProjectIngest
+              onIngestSuccess={handleIngestSuccess}
+              onError={handleError}
+              onNavigateStage={(stage) => setActiveTab(stage as NavTab)}
+            />
           )}
 
           {activeTab === "mentor" && (
@@ -126,6 +179,7 @@ export default function ParikshitCockpit() {
               onError={handleError}
               onSandboxRunComplete={(res) => {
                 if (res.task_id) setTaskId(res.task_id);
+                setCompletedStages((prev) => Array.from(new Set([...prev, "tasks"])));
               }}
             />
           )}
@@ -152,6 +206,36 @@ export default function ParikshitCockpit() {
       <CitationViewer
         citation={activeCitation}
         onClose={() => setActiveCitation(null)}
+      />
+
+      {/* Command Palette (Ctrl+K) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setCommandPaletteOpen(false);
+        }}
+        onLoadDemo={async () => {
+          try {
+            const res = await api.ingestProject({
+              source_type: "local",
+              source_uri: "./data/demo/calculator_app",
+              name: "Demo Calculator Service",
+            });
+            handleIngestSuccess(res);
+          } catch (err: unknown) {
+            if (err instanceof ApiClientError) handleError(err);
+          }
+        }}
+        onVerifyLedger={async () => {
+          try {
+            const v = await api.verifyLedger(projectId || undefined);
+            setLedgerStatus(v);
+          } catch (err: unknown) {
+            if (err instanceof ApiClientError) handleError(err);
+          }
+        }}
       />
     </div>
   );

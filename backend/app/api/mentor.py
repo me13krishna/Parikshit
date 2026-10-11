@@ -10,7 +10,7 @@ from app.services.ingestion_service import IngestionService
 from app.services.indexer_service import IndexerService
 from app.services.mentor_service import MentorService
 
-router = APIRouter(prefix="/projects", tags=["Codebase Mentor"])
+router = APIRouter(tags=["Codebase Mentor"])
 
 class IngestRequest(BaseModel):
     source_type: str = "git_url"  # git_url | local | zip
@@ -21,7 +21,15 @@ class ChatRequest(BaseModel):
     question: str
     conversation_id: Optional[str] = None
 
-@router.post("/ingest")
+class MentorDirectChatRequest(BaseModel):
+    revision_id: Optional[str] = None
+    project_id: Optional[str] = None
+    question: str
+    session_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+@router.post("/projects/ingest")
+@router.post("/projects")
 async def ingest_and_index(req: IngestRequest):
     # 1. Ingestion
     ingest_res = await IngestionService.ingest_repository(
@@ -39,6 +47,7 @@ async def ingest_and_index(req: IngestRequest):
     }, status_code=201)
 
 @router.get("/{project_id}/overview")
+@router.get("/projects/{project_id}/overview")
 async def get_overview(project_id: str):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
@@ -167,6 +176,7 @@ async def get_file_content(
             return error_response(f"Could not read file: {exc}", code="READ_ERROR", status_code=500)
 
 @router.get("/{project_id}/conversations")
+@router.get("/projects/{project_id}/conversations")
 async def list_conversations(project_id: str):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
@@ -179,6 +189,7 @@ async def list_conversations(project_id: str):
         return success_response({"conversations": [dict(r) for r in rows]})
 
 @router.get("/{project_id}/starter-tasks")
+@router.get("/projects/{project_id}/starter-tasks")
 async def get_starter_tasks(project_id: str):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
@@ -213,6 +224,7 @@ async def get_starter_tasks(project_id: str):
         return success_response({"starter_tasks": rows})
 
 @router.get("/{project_id}/symbols")
+@router.get("/projects/{project_id}/symbols")
 async def search_symbols(
     project_id: str,
     q: Optional[str] = Query(None),

@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
+@theme {
+  --color-ink-950: #00030f;
+  --color-ink-900: #060b1e;
+  --color-ink-800: #0d1430;
+  --color-glow-indigo: #140756;
+  --color-blue-500: #076cd3;
+  --color-indigo-500: #2e38de;
+  --color-sky-400: #39aaf0;
+  --color-cyan-300: #6ad7fa;
+  --color-teal-400: #2dd4c0;
+  --color-violet-400: #9390fb;
+  --color-lavender-300: #ad81db;
+  --color-text-100: #e8f4fa;
+  --color-text-300: #9fb0cc;
+  --color-text-500: #6b7a99;
+
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #fb7185;
+
+  --font-display: var(--font-sora), sans-serif;
+  --font-sans: var(--font-instrument), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+:root {
+  --grad-ring: linear-gradient(135deg, #2dd4c0 0%, #076cd3 40%, #9390fb 75%, #ad81db 100%);
+  --grad-ribbon: linear-gradient(135deg, #6ad7fa 0%, #076cd3 55%, #2e38de 100%);
+  --grad-panel-top: linear-gradient(90deg, #2dd4c0, #076cd3, #9390fb);
+  --grad-ambient: radial-gradient(circle at 92% 8%, rgba(20, 7, 86, 0.45) 0%, transparent 40%),
+                  radial-gradient(circle at 6% 92%, rgba(21, 12, 73, 0.50) 0%, transparent 45%);
+}
+
 @layer base {
-  :root {
-    --background: #090d16;
-    --foreground: #f1f5f9;
-    --card: #0f172a;
-    --card-foreground: #f8fafc;
-    --border: #1e293b;
-    --primary: #6366f1;
-    --primary-foreground: #ffffff;
-    --accent: #06b6d4;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
+  body {
+    background-color: var(--color-ink-950);
+    background-image: var(--grad-ambient);
+    background-attachment: fixed;
+    color: var(--color-text-100);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Accessible high-contrast focus outline */
+  :focus-visible {
+    outline: 2px solid var(--color-cyan-300);
+    outline-offset: 2px;
   }
 }
 
@@ -31,33 +72,65 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: var(--color-ink-950);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: rgba(159, 176, 204, 0.2);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: rgba(159, 176, 204, 0.35);
 }
 
-/* Glassmorphism and glow effects */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Active panel top gradient accent */
+.border-active-top {
+  position: relative;
 }
 
-.glow-indigo {
-  box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.25);
+.border-active-top::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--grad-ring);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
 }
 
-.glow-cyan {
-  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+/* Subtle ring orb animations */
+@keyframes orb-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
 }
 
-.glow-emerald {
-  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+.animate-orb {
+  animation: orb-pulse 2.5s ease-in-out infinite;
+}
+
+/* Motion accessibility overrides */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-orb,
+  .animate-spin,
+  .animate-pulse {
+    animation: none !important;
+  }
 }

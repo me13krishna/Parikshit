@@ -11,7 +11,6 @@ import {
   HealResult,
   TwinImpact,
   TwinNode,
-  ApiResponse,
   ApiError
 } from "./types";
 
@@ -55,7 +54,16 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       signal: controller.signal
     });
 
-    const body: ApiResponse<T> = await res.json().catch(() => ({
+    interface RawApiResponse<D> {
+      ok?: boolean;
+      success?: boolean;
+      data?: D;
+      error?: ApiError;
+      [key: string]: unknown;
+    }
+
+    const body = (await res.json().catch(() => ({
+      ok: false,
       success: false,
       data: null as unknown as T,
       error: {
@@ -63,9 +71,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         code: "INVALID_RESPONSE",
         status_code: res.status
       }
-    }));
+    }))) as RawApiResponse<T>;
 
-    if (!res.ok || !body.success) {
+    const isSuccess = body.ok === true || body.success === true;
+    if (!res.ok || !isSuccess) {
       const errorPayload: ApiError = body.error || {
         message: `HTTP ${res.status}: Server request failed`,
         code: `HTTP_${res.status}`,
@@ -74,7 +83,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       throw new ApiClientError(errorPayload);
     }
 
-    return body.data;
+    return (body.data !== undefined ? body.data : body) as T;
   } catch (err: unknown) {
     if (err instanceof ApiClientError) {
       throw err;
@@ -109,10 +118,15 @@ export const api = {
     name: string;
     branch?: string;
   }): Promise<{ project_id: string; default_revision_id: string; name: string }> {
-    return request("/projects/ingest", {
+    const res = await request<Record<string, unknown>>("/projects/ingest", {
       method: "POST",
       body: JSON.stringify(data)
     });
+    return {
+      project_id: String(res.project_id || ""),
+      default_revision_id: String(res.default_revision_id || res.revision_id || ""),
+      name: String(res.name || "")
+    };
   },
 
   async uploadZip(file: File, name: string): Promise<{ project_id: string; default_revision_id: string; name: string }> {
@@ -120,10 +134,15 @@ export const api = {
     formData.append("file", file);
     formData.append("name", name);
     formData.append("source_type", "zip");
-    return request("/projects/ingest", {
+    const res = await request<Record<string, unknown>>("/projects/ingest", {
       method: "POST",
       body: formData
     });
+    return {
+      project_id: String(res.project_id || ""),
+      default_revision_id: String(res.default_revision_id || res.revision_id || ""),
+      name: String(res.name || "")
+    };
   },
 
   async listProjects(): Promise<Array<{ id: string; name: string; source_type: string; default_revision_id: string }>> {
@@ -132,13 +151,7 @@ export const api = {
 
   // Mentor & Understanding
   async askMentor(revisionId: string, question: string, sessionId?: string) {
-    return request<{
-      answer: string;
-      grounded: boolean;
-      citations: Array<{ path: string; start_line: number; end_line: number; snippet?: string; verified?: boolean }>;
-      uncertainty_notes?: string;
-      session_id: string;
-    }>("/mentor/chat", {
+    const res = await request<Record<string, unknown>>("/mentor/chat", {
       method: "POST",
       body: JSON.stringify({
         revision_id: revisionId,
@@ -146,6 +159,13 @@ export const api = {
         session_id: sessionId
       })
     });
+    return {
+      answer: String(res.answer || res.answer_markdown || ""),
+      grounded: res.grounded !== undefined ? Boolean(res.grounded) : (res.status === "grounded"),
+      citations: (res.citations || []) as Array<{ path: string; start_line: number; end_line: number; snippet?: string; verified?: boolean }>,
+      uncertainty_notes: res.uncertainty_notes as string | undefined,
+      session_id: (res.session_id || res.conversation_id) as string | undefined
+    };
   },
 
   async getArchitecture(revisionId: string): Promise<ArchitectureOverview> {
@@ -158,10 +178,19 @@ export const api = {
 
   // Tasks & Builder
   async createTask(projectId: string, requestText: string): Promise<TaskItem> {
-    return request<TaskItem>("/tasks", {
+    const res = await request<Record<string, unknown>>("/tasks", {
       method: "POST",
       body: JSON.stringify({ project_id: projectId, request_text: requestText })
     });
+    return {
+      id: String(res.id || res.task_id || ""),
+      project_id: String(res.project_id || projectId),
+      request_text: String(res.request_text || requestText),
+      status: (String(res.status || "planning") as TaskItem["status"]),
+      plan_json: res.plan_json ? String(res.plan_json) : (res.plan ? JSON.stringify(res.plan) : undefined),
+      created_at: String(res.created_at || new Date().toISOString()),
+      updated_at: String(res.updated_at || new Date().toISOString())
+    };
   },
 
   async buildTask(taskId: string): Promise<{
@@ -172,9 +201,17 @@ export const api = {
     unified_diff: string;
     status: string;
   }> {
-    return request(`/tasks/${taskId}/build`, {
+    const res = await request<Record<string, unknown>>(`/tasks/${taskId}/build`, {
       method: "POST"
     });
+    return {
+      task_id: String(res.task_id || taskId),
+      workspace_id: String(res.workspace_id || ""),
+      patch_id: String(res.patch_id || ""),
+      files_changed: (res.files_changed || []) as string[],
+      unified_diff: String(res.unified_diff || ""),
+      status: String(res.status || "review")
+    };
   },
 
   async approveTask(taskId: string, decision: "approved" | "rejected", reason?: string) {
@@ -227,7 +264,10 @@ export const api = {
   // Ledger & Proof-of-Work
   async getLedgerEntries(projectId?: string, limit: number = 50): Promise<LedgerEntry[]> {
     const q = projectId ? `?project_id=${encodeURIComponent(projectId)}&limit=${limit}` : `?limit=${limit}`;
-    return request<LedgerEntry[]>(`/ledger/entries${q}`);
+    const res = await request<LedgerEntry[] | { entries: LedgerEntry[] }>(`/ledger/entries${q}`);
+    if (Array.isArray(res)) return res;
+    if (res && "entries" in res && Array.isArray(res.entries)) return res.entries;
+    return [];
   },
 
   async verifyLedger(projectId?: string): Promise<LedgerVerifyResult> {
