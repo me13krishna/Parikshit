@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: parikshit-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PARIKSHIT_ENV
+        value: production
+      - key: PARIKSHIT_DB_URL
+        value: sqlite:///./data/parikshit.db
+      - key: PARIKSHIT_DATA_DIR
+        value: ./data
+      - key: LLM_PROVIDER
+        value: mock
+      - key: AUTH_DISABLED
+        value: "true"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
