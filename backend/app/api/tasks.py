@@ -5,12 +5,42 @@ from pydantic import BaseModel
 import aiosqlite
 import json
 
-from app.core.errors import success_response, error_response
+from app.core.errors import success_response, error_response, AppError
 from app.db.database import get_db_path
 from app.services.task_service import TaskService
 from app.services.sandbox_service import SandboxService
 
 router = APIRouter(tags=["Engineering Tasks & Vibe Coding"])
+
+CHECK_PROFILES = {
+    "pytest": ["pytest", "-v"],
+    "pytest_coverage": ["pytest", "-v", "--cov=."],
+    "test_quick": ["pytest", "-q"]
+}
+
+def resolve_check_command(profile: Optional[str], command: Optional[str]) -> str:
+    if profile:
+        p_clean = profile.strip()
+        if p_clean in CHECK_PROFILES:
+            return " ".join(CHECK_PROFILES[p_clean])
+        raise AppError(
+            f"Invalid check profile '{profile}'. Allowed profiles: {list(CHECK_PROFILES.keys())}",
+            code="INVALID_CHECK_PROFILE",
+            status_code=400
+        )
+    if command:
+        c_clean = command.strip()
+        if c_clean in CHECK_PROFILES:
+            return " ".join(CHECK_PROFILES[c_clean])
+        for p_args in CHECK_PROFILES.values():
+            if c_clean == " ".join(p_args):
+                return c_clean
+        raise AppError(
+            f"Disallowed check command '{command}'. Allowed profiles: {list(CHECK_PROFILES.keys())}",
+            code="INVALID_CHECK_PROFILE",
+            status_code=400
+        )
+    return "pytest -v"
 
 class CreateTaskRequest(BaseModel):
     request_text: str
@@ -19,7 +49,8 @@ class ApprovalRequest(BaseModel):
     decision: str  # approved | rejected
 
 class RunCommandRequest(BaseModel):
-    command: str = "pytest -v"
+    profile: Optional[str] = None
+    command: Optional[str] = None
     timeout_sec: Optional[int] = None
 
 @router.post("/projects/{project_id}/tasks")
@@ -65,7 +96,12 @@ async def approve_and_build(task_id: str):
     return success_response(result)
 
 @router.post("/tasks/{task_id}/run-checks")
-async def run_checks(task_id: str, command: str = "pytest -v"):
+async def run_checks(
+    task_id: str,
+    command: Optional[str] = Query(default=None),
+    profile: Optional[str] = Query(default=None)
+):
+    resolved_cmd = resolve_check_command(profile, command)
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
@@ -76,7 +112,7 @@ async def run_checks(task_id: str, command: str = "pytest -v"):
 
         wsp_id = wsp["id"]
 
-    run_result = await SandboxService.run_command(wsp_id, command=command)
+    run_result = await SandboxService.run_command(wsp_id, command=resolved_cmd)
     return success_response(run_result)
 
 @router.post("/tasks/{task_id}/approve")
@@ -141,7 +177,8 @@ async def approve_task_plan(task_id: str):
 
 @router.post("/workspaces/{workspace_id}/runs")
 async def execute_workspace_run(workspace_id: str, req: RunCommandRequest):
-    run_result = await SandboxService.run_command(workspace_id, command=req.command, timeout_sec=req.timeout_sec)
+    resolved_cmd = resolve_check_command(req.profile, req.command)
+    run_result = await SandboxService.run_command(workspace_id, command=resolved_cmd, timeout_sec=req.timeout_sec)
     return success_response(run_result, status_code=201)
 
 @router.get("/runs/{run_id}")

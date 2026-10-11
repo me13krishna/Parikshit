@@ -111,7 +111,14 @@ class WorkspaceService:
         for rel_path, new_content in files_to_update.items():
             target_file = (workspace_dir / rel_path).resolve()
             # Guard against path traversal out of workspace
-            target_file.relative_to(workspace_dir.resolve())
+            try:
+                target_file.relative_to(workspace_dir.resolve())
+            except ValueError:
+                raise AppError(
+                    f"Path escapes workspace boundary: {rel_path}",
+                    code="PATH_ESCAPES_WORKSPACE",
+                    status_code=400
+                )
 
             target_file.parent.mkdir(parents=True, exist_ok=True)
             target_file.write_text(new_content, encoding="utf-8")

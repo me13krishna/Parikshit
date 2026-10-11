@@ -5,6 +5,8 @@ import uuid
 import hashlib
 import json
 import zipfile
+import asyncio
+import urllib.parse
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
@@ -37,22 +39,22 @@ class IngestionService:
         project_id = f"prj_{uuid.uuid4().hex[:12]}"
         revision_id = f"rev_{uuid.uuid4().hex[:12]}"
         now_iso = datetime.now(timezone.utc).isoformat()
-        
+
         project_name = name or Path(source_uri.rstrip("/").split("/")[-1]).stem or "unnamed_project"
         dest_dir = cls._get_project_dir(project_id) / "checkout"
-        
+
         logger.info(f"Ingesting project {project_name} from {source_uri} (type: {source_type}) into {dest_dir}...")
 
         commit_sha = "local_head"
         if source_type == "git_url":
-            commit_sha = cls._clone_git(source_uri, dest_dir)
+            commit_sha = await asyncio.to_thread(cls._clone_git, source_uri, dest_dir)
         elif source_type in ["local", "zip"]:
-            commit_sha = cls._copy_local(source_uri, dest_dir)
+            commit_sha = await asyncio.to_thread(cls._copy_local, source_uri, dest_dir)
         else:
             raise AppError(f"Unsupported source type: {source_type}", code="INVALID_SOURCE_TYPE")
 
         # Analyze storage, file count, and languages
-        file_count, byte_size, line_count, languages = cls._scan_directory(dest_dir)
+        file_count, byte_size, line_count, languages = await asyncio.to_thread(cls._scan_directory, dest_dir)
 
         # Enforce limits
         max_bytes = settings.MAX_REPO_SIZE_MB * 1024 * 1024
@@ -130,37 +132,101 @@ class IngestionService:
         }
 
     @staticmethod
-    def _clone_git(git_url: str, dest_dir: Path) -> str:
+    def _validate_git_url(git_url: str) -> None:
+        if git_url.startswith("-"):
+            raise AppError("Git URL cannot start with a dash", code="INVALID_GIT_URL")
+        parsed = urllib.parse.urlparse(git_url)
+        if parsed.scheme.lower() != "https":
+            raise AppError("Git clone only permits https:// URLs", code="INVALID_GIT_URL")
+
+        allowed_hosts = [h.strip().lower() for h in settings.ALLOWED_GIT_HOSTS.split(",") if h.strip()]
+        host = (parsed.hostname or "").lower()
+        if host not in allowed_hosts:
+            raise AppError(
+                f"Git host '{host}' is not in allowed hosts: {allowed_hosts}",
+                code="GIT_HOST_NOT_ALLOWED"
+            )
+
+    @classmethod
+    def _clone_git(cls, git_url: str, dest_dir: Path) -> str:
+        cls._validate_git_url(git_url)
         dest_dir.parent.mkdir(parents=True, exist_ok=True)
         if dest_dir.exists():
             shutil.rmtree(dest_dir)
-        
-        # Git clone shallow depth=1 for speed
-        cmd = ["git", "clone", "--depth", "1", git_url, str(dest_dir)]
-        res = subprocess.run(cmd, capture_output=True, text=True)
+
+        env = {
+            **os.environ,
+            "GIT_TERMINAL_PROMPT": "0"
+        }
+        cmd = ["git", "clone", "--depth", "1", "--", git_url, str(dest_dir)]
+        res = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if res.returncode != 0:
             raise AppError(f"Git clone failed: {res.stderr.strip()}", code="GIT_CLONE_FAILED")
 
-        # Get latest commit sha
         res_sha = subprocess.run(
             ["git", "-C", str(dest_dir), "rev-parse", "HEAD"],
             capture_output=True,
-            text=True
+            text=True,
+            env=env
         )
         return res_sha.stdout.strip() if res_sha.returncode == 0 else "unknown_sha"
 
-    @staticmethod
-    def _copy_local(source_path: str, dest_dir: Path) -> str:
+    @classmethod
+    def _validate_local_source(cls, source_path: Path) -> None:
+        import tempfile
+        allowed_roots = [
+            Path(r.strip()).resolve()
+            for r in settings.PARIKSHIT_LOCAL_SOURCE_ROOTS.split(",")
+            if r.strip()
+        ]
+        allowed_roots.append(Path(tempfile.gettempdir()).resolve())
+        resolved_src = source_path.resolve()
+        is_allowed = False
+        for root in allowed_roots:
+            try:
+                resolved_src.relative_to(root)
+                is_allowed = True
+                break
+            except ValueError:
+                continue
+
+        if not is_allowed and settings.PARIKSHIT_ENV != "development":
+            raise AppError(
+                f"Local source path '{source_path}' is not within allowed source roots",
+                code="LOCAL_SOURCE_DISALLOWED"
+            )
+        elif not is_allowed:
+            # In development, also check repository workspace root
+            cwd = Path.cwd().resolve()
+            try:
+                resolved_src.relative_to(cwd)
+                is_allowed = True
+            except ValueError:
+                pass
+            if not is_allowed:
+                raise AppError(
+                    f"Local source path '{source_path}' is outside allowed roots",
+                    code="LOCAL_SOURCE_DISALLOWED"
+                )
+
+    @classmethod
+    def _copy_local(cls, source_path: str, dest_dir: Path) -> str:
         src = Path(source_path).resolve()
         if not src.exists():
             raise AppError(f"Source path {source_path} not found", code="SOURCE_PATH_NOT_FOUND")
 
+        cls._validate_local_source(src)
+
         dest_dir.parent.mkdir(parents=True, exist_ok=True)
         if dest_dir.exists():
             shutil.rmtree(dest_dir)
 
+        max_file_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+        max_repo_bytes = settings.MAX_REPO_SIZE_MB * 1024 * 1024
+
         if src.is_file() and (src.suffix.lower() == ".zip" or zipfile.is_zipfile(src)):
             dest_dir.mkdir(parents=True, exist_ok=True)
+            total_uncompressed = 0
             with zipfile.ZipFile(src, "r") as zf:
                 for member in zf.infolist():
                     member_path = Path(member.filename)
@@ -177,11 +243,24 @@ class IngestionService:
                             f"Malicious ZIP archive: path escapes destination ({member.filename})",
                             code="PATH_TRAVERSAL_DETECTED"
                         )
+                    if member.file_size > max_file_bytes:
+                        raise AppError(
+                            f"ZIP member {member.filename} exceeds max file size of {settings.MAX_FILE_SIZE_MB}MB",
+                            code="FILE_SIZE_EXCEEDED"
+                        )
+                    total_uncompressed += member.file_size
+                    if total_uncompressed > max_repo_bytes:
+                        raise AppError(
+                            f"ZIP archive total uncompressed size exceeds limit of {settings.MAX_REPO_SIZE_MB}MB",
+                            code="REPO_SIZE_EXCEEDED"
+                        )
                     zf.extract(member, dest_dir)
         elif src.is_dir():
             shutil.copytree(
                 src,
                 dest_dir,
+                symlinks=False,
+                ignore_dangling_symlinks=True,
                 ignore=shutil.ignore_patterns(".git", "__pycache__", "node_modules", ".venv")
             )
         else:
@@ -189,9 +268,11 @@ class IngestionService:
 
         # Compute content hash as commit SHA
         hasher = hashlib.sha256()
-        for root, _, files in os.walk(dest_dir):
+        for root, _, files in os.walk(dest_dir, followlinks=False):
             for file in sorted(files):
                 p = Path(root) / file
+                if p.is_symlink():
+                    continue
                 hasher.update(file.encode("utf-8"))
                 try:
                     hasher.update(p.read_bytes())
@@ -205,6 +286,7 @@ class IngestionService:
         total_bytes = 0
         total_lines = 0
         languages: Dict[str, int] = {}
+        max_file_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
         EXT_MAP = {
             ".py": "python",
@@ -223,12 +305,19 @@ class IngestionService:
 
         SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".next", "dist", "build"}
 
-        for root, dirs, files in os.walk(dir_path):
+        for root, dirs, files in os.walk(dir_path, followlinks=False):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
             for f in files:
                 fpath = Path(root) / f
+                if fpath.is_symlink():
+                    continue
                 try:
                     sz = fpath.stat().st_size
+                    if sz > max_file_bytes:
+                        raise AppError(
+                            f"File '{f}' ({sz / (1024*1024):.1f}MB) exceeds limit of {settings.MAX_FILE_SIZE_MB}MB",
+                            code="FILE_SIZE_EXCEEDED"
+                        )
                     total_bytes += sz
                     total_files += 1
 
@@ -243,6 +332,8 @@ class IngestionService:
                                 total_lines += sum(1 for _ in fp)
                         except Exception:
                             pass
+                except AppError:
+                    raise
                 except Exception:
                     pass
 

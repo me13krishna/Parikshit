@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
-    pytest \
-    coverage
+    pytest==8.3.3 \
+    coverage==7.6.4
 
 # Create non-root unprivileged sandbox user
 RUN useradd -m -u 1000 -s /bin/bash sandboxuser

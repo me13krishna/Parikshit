@@ -16,6 +16,8 @@ from app.core.errors import AppError
 from app.db.database import get_db_path
 from app.services.ledger_service import LedgerService
 
+import asyncio
+
 class SandboxService:
     @classmethod
     async def run_command(
@@ -50,7 +52,9 @@ class SandboxService:
         logger.info(f"Sandbox executing '{command}' in workspace {workspace_id} (timeout={timeout}s)...")
 
         start_time = time.time()
-        exit_code, stdout, stderr, run_status = cls._execute_in_environment(storage_path, command, timeout)
+        exit_code, stdout, stderr, run_status, mode = await asyncio.to_thread(
+            cls._execute_in_environment, storage_path, command, timeout
+        )
         duration_ms = int((time.time() - start_time) * 1000)
 
         # Parse test results if pytest was run
@@ -89,6 +93,8 @@ class SandboxService:
                 "exit_code": exit_code,
                 "status": run_status,
                 "duration_ms": duration_ms,
+                "execution_mode": mode,
+                "is_sandboxed": (mode == "docker"),
                 "total_tests": len(test_outcomes),
                 "passed_tests": sum(1 for t in test_outcomes if t["outcome"] == "passed")
             },
@@ -101,6 +107,8 @@ class SandboxService:
             "command": command,
             "exit_code": exit_code,
             "status": run_status,
+            "execution_mode": mode,
+            "is_sandboxed": (mode == "docker"),
             "duration_ms": duration_ms,
             "stdout": stdout,
             "stderr": stderr,
@@ -113,7 +121,7 @@ class SandboxService:
         workspace_path: Path,
         command: str,
         timeout: int
-    ) -> Tuple[int, str, str, str]:
+    ) -> Tuple[int, str, str, str, str]:
         # Clean environment to prevent secret leakage while preserving system essentials
         clean_env = {
             "PATH": os.environ.get("PATH", ""),
@@ -124,29 +132,50 @@ class SandboxService:
             if k in os.environ:
                 clean_env[k] = os.environ[k]
 
-        # If Docker is enabled, attempt docker execution
+        # If Docker is enabled, execute inside Docker container
         if settings.SANDBOX_ENABLED:
+            container_name = f"parikshit_run_{uuid.uuid4().hex[:10]}"
+            docker_cmd = [
+                "docker", "run", "--rm",
+                "--name", container_name,
+                "--network", settings.SANDBOX_NETWORK,
+                "--memory", settings.SANDBOX_MEMORY_LIMIT,
+                "--cpus", str(settings.SANDBOX_CPU_LIMIT),
+                "--user", "1000:1000",
+                "--read-only",
+                "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+                "--cap-drop", "ALL",
+                "--security-opt", "no-new-privileges",
+                "--pids-limit", "100",
+                "-v", f"{workspace_path.resolve()}:/workspace:rw",
+                "-w", "/workspace",
+                settings.SANDBOX_IMAGE
+            ] + command.split()
+
             try:
-                docker_cmd = [
-                    "docker", "run", "--rm",
-                    "--network", "none",
-                    "--memory", "512m",
-                    "--cpus", "1.0",
-                    "--user", "1000:1000",
-                    "-v", f"{workspace_path.resolve()}:/workspace",
-                    "-w", "/workspace",
-                    settings.SANDBOX_IMAGE,
-                    "bash", "-c", command
-                ]
                 res = subprocess.run(docker_cmd, capture_output=True, text=True, timeout=timeout)
                 status = "succeeded" if res.returncode == 0 else "failed"
-                return res.returncode, res.stdout, res.stderr, status
+                return res.returncode, res.stdout, res.stderr, status, "docker"
+            except subprocess.TimeoutExpired:
+                subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+                return 124, "", f"Container timed out after {timeout} seconds", "timeout", "docker"
             except Exception as e:
-                logger.warning(f"Docker sandbox execution failed, falling back to local isolation: {e}")
+                # Do NOT silently fallback to host execution
+                logger.error(f"Docker sandbox execution error: {e}")
+                return 1, "", f"Sandbox Docker execution failed: {e}", "failed", "docker"
 
-        # Local isolated subprocess execution
+        # Local execution when SANDBOX_ENABLED is False
+        if settings.PARIKSHIT_ENV != "development":
+            raise AppError(
+                "SANDBOX_ENABLED=false is disallowed when PARIKSHIT_ENV is not 'development'",
+                code="SANDBOX_REQUIRED_IN_PROD",
+                status_code=403
+            )
+
+        logger.warning("WARNING: Executing checks UNSANDBOXED on host because SANDBOX_ENABLED=false (development mode)")
+        mode = "UNSANDBOXED (host-dev)"
+
         try:
-            # If command starts with pytest or python, execute via python
             if command.startswith("pytest"):
                 py_exec = sys.executable
                 cmd_args = [py_exec, "-m"] + command.split()
@@ -162,12 +191,12 @@ class SandboxService:
                 timeout=timeout
             )
             status = "succeeded" if res.returncode == 0 else "failed"
-            return res.returncode, res.stdout, res.stderr, status
+            return res.returncode, res.stdout, res.stderr, status, mode
 
         except subprocess.TimeoutExpired:
-            return 124, "", f"Command timed out after {timeout} seconds", "timeout"
+            return 124, "", f"Command timed out after {timeout} seconds", "timeout", mode
         except Exception as exc:
-            return 1, "", str(exc), "failed"
+            return 1, "", str(exc), "failed", mode
 
     @classmethod
     def _parse_pytest_output(cls, output: str) -> List[Dict[str, Any]]:

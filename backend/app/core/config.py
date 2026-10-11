@@ -26,15 +26,20 @@ class Settings(BaseSettings):
     SANDBOX_IMAGE: str = "parikshit-sandbox:latest"
     SANDBOX_TIMEOUT_SEC: int = 120
     SANDBOX_NETWORK: str = "none"
+    SANDBOX_MEMORY_LIMIT: str = "512m"
+    SANDBOX_CPU_LIMIT: str = "1.0"
 
     # Repository Limits
     MAX_REPO_SIZE_MB: int = 200
     MAX_FILE_COUNT: int = 3000
     MAX_FILE_SIZE_MB: int = 5
     ALLOWED_GIT_HOSTS: str = "github.com,gitlab.com,bitbucket.org"
+    PARIKSHIT_LOCAL_SOURCE_ROOTS: str = "./data/demo,data/demo"
 
-    # Auth
+    # Security & Auth
     AUTH_DISABLED: bool = True
+    PARIKSHIT_API_KEY: str = ""
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000"
 
     model_config = {
         "env_file": ".env",
