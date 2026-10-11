@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Parikshit Web Cockpit
 
-## Getting Started
+Production-grade Next.js (App Router, Turbopack, Tailwind CSS) cockpit for **Parikshit: The Grounded AI Engineering Teammate**.
 
-First, run the development server:
+## Architecture & Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+The cockpit interfaces directly with the FastAPI backend engine to visualize and control the five pillars:
+
+1. **Grounded Mentor (Pillar 1):** Interactive architectural guidance and code query interface where every claim is strictly linked to AST verified file paths and line ranges. Clickable citation pills allow inspecting snippets and SHA-256 hashes.
+2. **Vibe Builder & Human Gate (Pillar 2):** Automated task breakdown and patch generation inside isolated worktrees. Strictly gates code export until human approval is cryptographically logged.
+3. **AI vs AI Battle Arena (Pillar 3):** Side-by-side visualization of the Builder, Adversary QA (boundary condition attacks), and Reviewer synthesis with severity ratings and residual risks.
+4. **Proof-of-Work Hash Ledger (Pillar 4):** Real-time audit timeline showing SHA-256 hash chains for all events. Features one-click chain tamper verification and cryptographic Evidence Pack JSON downloads.
+5. **Self-Healing Loop (Pillar 5):** Automated diagnose-patch-verify loop triggered upon failing test suites.
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx         # Root layout with fonts & metadata
+│   │   ├── page.tsx           # Cockpit orchestrator view
+│   │   └── globals.css        # Theme tokens and dark mode styling
+│   ├── components/            # Modular cockpit components
+│   │   ├── Banner.tsx         # Mock mode & unsandboxed host warnings
+│   │   ├── Header.tsx         # Telemetry badges and ledger status
+│   │   ├── Sidebar.tsx        # Pillar navigation tabs
+│   │   ├── ProjectIngest.tsx  # Git, Local, and safe ZIP repo ingester
+│   │   ├── MentorChat.tsx     # Grounded Q&A with AST citations
+│   │   ├── CitationViewer.tsx # Grounded snippet inspect modal
+│   │   ├── TaskPlanner.tsx    # Vibe builder and human gate
+│   │   ├── DiffViewer.tsx     # Color-coded unified patch diff viewer
+│   │   ├── SandboxResults.tsx # Test execution console & self-heal trigger
+│   │   ├── BattleReport.tsx   # Multi-round arena breakdown
+│   │   ├── TwinGraph.tsx      # Digital twin dependency & blast radius
+│   │   └── LedgerTimeline.tsx # Tamper-evident ledger timeline
+│   └── lib/
+│       ├── api.ts             # Typed API client with error envelope handling
+│       └── types.ts           # Shared TypeScript domain models
+└── vitest.config.ts           # Vitest configuration for unit tests
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Running Locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Install dependencies
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run unit tests
+npm test
 
-## Learn More
+# Run development server
+npm run dev
 
-To learn more about Next.js, take a look at the following resources:
+# Build production bundle
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Backend FastAPI base URL |
+| `NEXT_PUBLIC_PARIKSHIT_API_KEY` | *(optional)* | API key passed in `X-API-Key` header |
