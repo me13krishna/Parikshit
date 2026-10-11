@@ -1,27 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Sora, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-
-const sora = Sora({
-  subsets: ["latin"],
-  variable: "--font-sora",
-  display: "swap",
-  weight: ["400", "600", "700"],
-});
-
-const instrumentSans = Instrument_Sans({
-  subsets: ["latin"],
-  variable: "--font-instrument",
-  display: "swap",
-  weight: ["400", "500", "600"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-  weight: ["400", "500"],
-});
 
 export const viewport: Viewport = {
   themeColor: "#00030F",
@@ -75,10 +53,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`dark ${sora.variable} ${instrumentSans.variable} ${jetbrainsMono.variable}`}
-    >
+    <html lang="en" className="dark">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Sora:wght@100..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="antialiased min-h-screen text-[var(--color-text-100)] bg-[var(--color-ink-950)] selection:bg-[var(--color-cyan-300)]/20 selection:text-[var(--color-cyan-300)]">
         <a
           href="#main-content"

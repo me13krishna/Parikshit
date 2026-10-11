@@ -31,6 +31,9 @@
 }
 
 :root {
+  --font-sora: 'Sora', sans-serif;
+  --font-instrument: 'Instrument Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
   --grad-ring: linear-gradient(135deg, #2dd4c0 0%, #076cd3 40%, #9390fb 75%, #ad81db 100%);
   --grad-ribbon: linear-gradient(135deg, #6ad7fa 0%, #076cd3 55%, #2e38de 100%);
   --grad-panel-top: linear-gradient(90deg, #2dd4c0, #076cd3, #9390fb);
