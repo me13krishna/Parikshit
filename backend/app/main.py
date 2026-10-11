@@ -16,6 +16,7 @@ from app.api.mentor import router as mentor_router
 from app.api.tasks import router as tasks_router
 from app.api.battles import router as battles_router
 from app.api.twin import router as twin_router
+from app.api.jobs import router as jobs_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -95,6 +96,7 @@ app.include_router(mentor_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(battles_router, prefix="/api/v1")
 app.include_router(twin_router, prefix="/api/v1")
+app.include_router(jobs_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

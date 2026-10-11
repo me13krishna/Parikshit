@@ -89,3 +89,38 @@ async def get_evidence_pack(task_id: str):
     }
 
     return success_response(evidence_pack)
+
+@router.get("/battles/{battle_id}/report")
+async def get_battle_report(battle_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        b_cursor = await db.execute("SELECT * FROM battles WHERE id = ?;", (battle_id,))
+        battle = await b_cursor.fetchone()
+        if not battle:
+            return error_response("Battle not found", code="BATTLE_NOT_FOUND", status_code=404)
+
+        rounds_cursor = await db.execute(
+            "SELECT * FROM battle_rounds WHERE battle_id = ? ORDER BY round_number ASC;",
+            (battle_id,)
+        )
+        rounds = [dict(r) for r in await rounds_cursor.fetchall()]
+
+    return success_response({
+        "battle_id": battle_id,
+        "task_id": battle["task_id"],
+        "status": battle["status"],
+        "rounds": rounds,
+        "final_verdict": "verified" if battle["status"] in ["concluded", "passed"] else battle["status"]
+    })
+
+@router.get("/repair-attempts/{attempt_id}")
+async def get_repair_attempt(attempt_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM repair_attempts WHERE id = ?;", (attempt_id,))
+        attempt = await cursor.fetchone()
+        if not attempt:
+            return error_response(f"Repair attempt {attempt_id} not found", code="ATTEMPT_NOT_FOUND", status_code=404)
+        return success_response(dict(attempt))

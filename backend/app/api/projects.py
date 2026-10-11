@@ -87,3 +87,20 @@ async def get_project(project_id: str):
         "project": dict(row),
         "revisions": revisions
     })
+
+@router.get("/{project_id}/revisions")
+async def list_project_revisions(project_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        p_cursor = await db.execute("SELECT id FROM projects WHERE id = ?;", (project_id,))
+        if not await p_cursor.fetchone():
+            return error_response(f"Project {project_id} not found", code="PROJECT_NOT_FOUND", status_code=404)
+
+        rev_cursor = await db.execute(
+            "SELECT * FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC;",
+            (project_id,)
+        )
+        revisions = [dict(r) for r in await rev_cursor.fetchall()]
+
+    return success_response({"revisions": revisions, "count": len(revisions)})

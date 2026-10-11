@@ -165,3 +165,85 @@ async def get_file_content(
             })
         except Exception as exc:
             return error_response(f"Could not read file: {exc}", code="READ_ERROR", status_code=500)
+
+@router.get("/{project_id}/conversations")
+async def list_conversations(project_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM conversations WHERE project_id = ? ORDER BY created_at DESC;",
+            (project_id,)
+        )
+        rows = await cursor.fetchall()
+        return success_response({"conversations": [dict(r) for r in rows]})
+
+@router.get("/{project_id}/starter-tasks")
+async def get_starter_tasks(project_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT s.* FROM starter_tasks s
+            JOIN repo_revisions r ON s.revision_id = r.id
+            WHERE r.project_id = ?
+            ORDER BY s.created_at DESC;
+            """,
+            (project_id,)
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+        if not rows:
+            rows = [
+                {
+                    "id": f"stk_{project_id[:8]}_1",
+                    "title": "Explore codebase entrypoints and data model",
+                    "rationale": "High-impact onboarding starting point",
+                    "risk_level": "low",
+                    "status": "open"
+                },
+                {
+                    "id": f"stk_{project_id[:8]}_2",
+                    "title": "Run test suite and verify test coverage",
+                    "rationale": "Verify baseline reliability in sandbox",
+                    "risk_level": "low",
+                    "status": "open"
+                }
+            ]
+        return success_response({"starter_tasks": rows})
+
+@router.get("/{project_id}/symbols")
+async def search_symbols(
+    project_id: str,
+    q: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200)
+):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        if q:
+            cursor = await db.execute(
+                """
+                SELECT s.id, s.name, s.kind, s.start_line, s.end_line, s.signature, f.path
+                FROM symbols s
+                JOIN files f ON s.file_id = f.id
+                JOIN repo_revisions r ON f.revision_id = r.id
+                WHERE r.project_id = ? AND s.name LIKE ?
+                LIMIT ?;
+                """,
+                (project_id, f"%{q}%", limit)
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT s.id, s.name, s.kind, s.start_line, s.end_line, s.signature, f.path
+                FROM symbols s
+                JOIN files f ON s.file_id = f.id
+                JOIN repo_revisions r ON f.revision_id = r.id
+                WHERE r.project_id = ?
+                LIMIT ?;
+                """,
+                (project_id, limit)
+            )
+        rows = [dict(r) for r in await cursor.fetchall()]
+        return success_response({"symbols": rows, "count": len(rows)})

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import aiosqlite
 import json
@@ -16,6 +17,10 @@ class CreateTaskRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     decision: str  # approved | rejected
+
+class RunCommandRequest(BaseModel):
+    command: str = "pytest -v"
+    timeout_sec: Optional[int] = None
 
 @router.post("/projects/{project_id}/tasks")
 async def create_task(project_id: str, req: CreateTaskRequest):
@@ -102,3 +107,72 @@ async def get_task_diff(task_id: str):
         "unified_diff": row["unified_diff"],
         "files_changed": json.loads(row["files_changed"])
     })
+
+@router.post("/tasks/{task_id}/plan")
+async def generate_task_plan(task_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM tasks WHERE id = ?;", (task_id,))
+        task = await cursor.fetchone()
+        if not task:
+            return error_response(f"Task {task_id} not found", code="TASK_NOT_FOUND", status_code=404)
+
+        plan_cursor = await db.execute("SELECT * FROM plans WHERE task_id = ? ORDER BY created_at DESC LIMIT 1;", (task_id,))
+        plan = await plan_cursor.fetchone()
+        plan_content = json.loads(plan["content"]) if plan else {
+            "steps": [
+                "Understand repository context and existing interfaces",
+                "Generate precise unified diff patch in isolated workspace",
+                "Execute automated test suite in sandbox runner",
+                "Require human approval gate before final merge"
+            ]
+        }
+    return success_response({"task_id": task_id, "plan": plan_content})
+
+@router.post("/tasks/{task_id}/approve-plan")
+async def approve_task_plan(task_id: str):
+    db_path = get_db_path()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("UPDATE plans SET approved_at = ? WHERE task_id = ?;", (now_iso, task_id))
+        await db.commit()
+    return success_response({"task_id": task_id, "approved_at": now_iso, "status": "plan_approved"})
+
+@router.post("/workspaces/{workspace_id}/runs")
+async def execute_workspace_run(workspace_id: str, req: RunCommandRequest):
+    run_result = await SandboxService.run_command(workspace_id, command=req.command, timeout_sec=req.timeout_sec)
+    return success_response(run_result, status_code=201)
+
+@router.get("/runs/{run_id}")
+async def get_sandbox_run(run_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM sandbox_runs WHERE id = ?;", (run_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return error_response(f"Run {run_id} not found", code="RUN_NOT_FOUND", status_code=404)
+
+        t_cursor = await db.execute("SELECT * FROM test_results WHERE sandbox_run_id = ?;", (run_id,))
+        tests = [dict(t) for t in await t_cursor.fetchall()]
+
+        a_cursor = await db.execute("SELECT * FROM evidence_artifacts WHERE sandbox_run_id = ?;", (run_id,))
+        artifacts = [dict(a) for a in await a_cursor.fetchall()]
+
+    return success_response({
+        **dict(row),
+        "tests": tests,
+        "artifacts": artifacts
+    })
+
+@router.get("/runs/{run_id}/artifacts/{artifact_id}")
+async def get_run_artifact(run_id: str, artifact_id: str):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM evidence_artifacts WHERE id = ? AND sandbox_run_id = ?;", (artifact_id, run_id))
+        row = await cursor.fetchone()
+        if not row:
+            return error_response("Artifact not found", code="ARTIFACT_NOT_FOUND", status_code=404)
+        return success_response(dict(row))
