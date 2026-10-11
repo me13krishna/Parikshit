@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/parikshit_logo.jpg" alt="Parikshit Logo" width="200" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
+  <img src="docs/assets/parikshit-lockup.png" alt="Parikshit Brand Lockup" width="340" />
 </p>
 
 <h1 align="center">Parikshit — Grounded AI Engineering Teammate</h1>
@@ -24,10 +24,10 @@
 
 ---
 
-## 📸 Product Walkthrough & Demo
+## 📸 Product Walkthrough & Screenshots
 
 <p align="center">
-  <img src="docs/images/parikshit_logo.jpg" alt="Parikshit Cockpit Demo" width="750" style="border-radius: 12px; border: 1px solid #27272a;" />
+  <img src="docs/images/ui/overview-1280.png" alt="Parikshit Cockpit Overview with Pipeline Orbit" width="850" style="border-radius: 12px; border: 1px solid rgba(159,176,204,0.2); box-shadow: 0 16px 48px -8px rgba(0,3,15,0.8);" />
 </p>
 
 > **Recording Playbook:** See [`scripts/record_demo.md`](./scripts/record_demo.md) for the complete 2-minute step-by-step recording guide covering Ingestion, Grounded Mentor, Vibe Builder, AI-vs-AI Battle, and the Ledger Audit.

@@ -98,7 +98,66 @@ npm run build: Compiled successfully via Turbopack (Next.js 16.4.0)
 
 ---
 
-## 4. Deliberately Left Undone & Rationale
+## 4. UI/UX: Logo-Driven Cockpit Redesign
+
+### Design Foundations & Token Architecture
+- **Logo Asset Generation (`scripts/make_brand_assets.py`):**
+  - Sampled exact RGB chromatic values from `frontend/public/brand/parikshit-logo-original.jpg`.
+  - Extracted alpha-blended transparent assets using quadratic luminance falloff (`gamma=0.92`, `floor=12.0`) to eliminate black halo artifacts.
+  - Generated web-ready assets into `frontend/public/brand/`: `mark.png` (`@2x`), `wordmark.png` (`@2x`), `lockup.png` (`@2x`), `lockup-stacked.png`, `favicon.ico`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, and Open Graph `og-image.png` (1200x630).
+- **Tailwind v4 Theme Tokens (`frontend/src/app/globals.css`):**
+  - Dark-first foundation: background `ink-950` (`#00030F`), surfaces `ink-900` (`#060B1E`), elevated inputs `ink-800` (`#0D1430`), ambient glows `glow-indigo` (`#140756`).
+  - Brand accents: `blue-500` (`#076CD3`), `indigo-500` (`#2E38DE`), `sky-400` (`#39AAF0`), `cyan-300` (`#6AD7FA`), `violet-400` (`#9390FB`), `lavender-300` (`#AD81DB`).
+  - Semantic gradients: `--grad-ring` (teal-400 -> blue-500 -> violet-400 -> lavender-300) and `--grad-ribbon` (cyan-300 -> blue-500 -> indigo-500).
+  - Agent role colors: Builder (`blue-500`), Adversary (`violet-400`), Reviewer (`cyan-300`).
+  - High-contrast focus rings (`2px solid cyan-300` with 2px offset).
+  - Typography: Display typography powered by `Sora`, body text by `Instrument Sans`, and code/hashes by `JetBrains Mono` via self-hosted `next/font/google`.
+
+### Generic-AI Trap Review & Elimination
+- **Trap 1 (Uniform Neon Violet Gloom):** Replaced arbitrary purple blobs with a calm, dark navy canvas (`ink-950`) accented by subtle logo-sampled corner glows and high-contrast text tokens (`text-100`, `text-300`).
+- **Trap 2 (Card-in-Card Clutter):** Replaced repetitive floating cards with functional layout surfaces with differentiated border-radii (`rounded-sm` for chips, `rounded-lg` for panels, `rounded-2xl` for hero orbit).
+- **Trap 3 (Gratuitous Gradients):** Confined brand gradients to semantic indicators—the Pipeline Orbit ring and the 1px top highlight on active panels.
+- **Trap 4 (ALL-CAPS & Monospace Overuse):** Enforced clean sentence case across all headings and labels, reserving monospace strictly for file paths, line numbers, commit SHAs, and SHA-256 block hashes.
+- **Trap 5 (Scattershot Hover Motions):** Eliminated card bounce animations. Confined transitions to 150–250ms ease-out functional feedback, fully disabled under `prefers-reduced-motion`.
+- **Trap 6 (Faux 01/02/03 Steps):** Numbering is reserved strictly for the genuine 5-stage sequential engineering pipeline (**Understand → Change → Challenge → Verify → Prove**).
+
+### App Shell & Interactive Capabilities
+- **Persistent App Shell (`Sidebar.tsx`, `Header.tsx`):**
+  - Collapsible desktop left rail displaying the brand lockup, project switcher, and 5 verb-driven stages with feature descriptions.
+  - Responsive layout: Collapses into an accessible drawer and persistent fixed bottom navigation bar on mobile, ensuring **zero horizontal scrolling at 360px width**.
+  - Header displays active project, mode badges (LLM Provider: real/mock, Sandbox: Docker/Unsandboxed), and a compact luminous 5-node Pipeline Orbit indicator.
+- **Accessible Command Palette (`CommandPalette.tsx`):**
+  - Global `Ctrl+K` / `Cmd+K` keyboard shortcut dialog with focus trapping and ArrowUp/Down item navigation.
+  - Quick stage switching, demo repository ingestion, test execution, and ledger verification.
+- **Five-Stage Engineering Cockpit:**
+  1. **Overview (`ProjectIngest.tsx`):** Hero featuring the 5-node Pipeline Orbit and 1-click Demo Repository loader, alongside sanitized Git clone, local directory, and ZIP upload inputs.
+  2. **Understand (`MentorChat.tsx`, `CitationViewer.tsx`):** Grounded AI assistant with verified `path:lines` citation chips. Clicking opens a drawer displaying exact AST code lines and copy actions.
+  3. **Change (`TaskPlanner.tsx`, `DiffViewer.tsx`):** Implementation planner with unified code diff (+/- gutters) and a prominent Human Approval Gate with confirmation modal.
+  4. **Challenge (`BattleReport.tsx`):** 3-lane AI-vs-AI battle arena (Builder, Adversary, Reviewer) with sequential round transcripts, severity badges, and final verdict synthesis.
+  5. **Verify (`TwinGraph.tsx`, `SandboxResults.tsx`):** Digital Twin blast-radius impact analysis with risk chips, live sandbox output, and self-heal iterations.
+  6. **Prove (`LedgerTimeline.tsx`):** Tamper-evident ledger timeline with visual connecting gradient chain, payload inspector, real-time integrity verification, and Evidence Pack download.
+
+### Testing & Verification
+- **Automated Test Coverage:**
+  - Expanded frontend Vitest suites to **18 passing tests across 6 test files**:
+    - `src/lib/__tests__/api.test.ts` (3 tests: API contracts, error envelope parsing, error codes)
+    - `src/components/__tests__/Header.test.tsx` (2 tests: mark lockup, test-compatible ledger badge)
+    - `src/components/__tests__/Banner.test.tsx` (3 tests: error code rendering, correlation ID copy button, telemetry mode badges)
+    - `src/components/__tests__/CommandPalette.test.tsx` (4 tests: open/close dialog, search filtering, stage navigation, keyboard navigation)
+    - `src/components/__tests__/EmptyStates.test.tsx` (4 tests: invitation-to-act empty states with triggers)
+    - `src/components/__tests__/Accessibility.test.tsx` (2 tests: automated `axe-core` accessibility rules)
+- **Playwright Screenshot Verification:**
+  - Automated Playwright script (`scripts/take_screenshots.mjs`, runnable via `npm run screenshots`) capturing 13 screenshots into `docs/images/ui/`:
+    - Desktop (1280px): `desktop-00-overview.png`, `desktop-01-understand-mentor.png`, `desktop-02-change-tasks.png`, `desktop-03-challenge-battle.png`, `desktop-04-verify-twin.png`, `desktop-05-prove-ledger.png`, `desktop-06-command-palette.png`.
+    - Mobile (360px): `mobile-00-overview.png`, `mobile-01-understand-mentor.png`, `mobile-02-change-tasks.png`, `mobile-03-challenge-battle.png`, `mobile-04-verify-twin.png`, `mobile-05-prove-ledger.png`.
+- **Production Build & Linting:**
+  - Next.js 16.4.0 Turbopack production build passes in under 1 second.
+  - ESLint passes with **0 errors and 0 warnings**.
+  - Backend pytest passes **25/25 tests** in 13.82s.
+
+---
+
+## 5. Deliberately Left Undone & Rationale
 
 1. **External RFC 3161 Timestamping Authority Integration:**
    - *Rationale:* Anchoring the SHA-256 ledger head hash to a public blockchain or RFC 3161 TSA requires external network dependencies and account credentials. The offline hash-chain and database triggers provide tamper-evidence for single-node deployments; recommendations for external anchoring are documented in `SECURITY.md` and `docs/06_SECURITY_ERROR_LOGGING.md`.
@@ -106,3 +165,4 @@ npm run build: Compiled successfully via Turbopack (Next.js 16.4.0)
    - *Rationale:* Running a Docker daemon inside a container requires privileged mode or mounting `/var/run/docker.sock`. Mounting the Docker socket is documented as an optional compose mount with appropriate security warnings regarding host root equivalence.
 3. **Third-Party Provider Live API Keys in CI:**
    - *Rationale:* CI runs strictly with `LLM_PROVIDER=mock`, guaranteeing deterministic execution, zero external network flakes, and zero cost while testing all 5 pillars end-to-end.
+
