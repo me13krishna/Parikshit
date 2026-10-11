@@ -5,6 +5,8 @@ from app.core.errors import success_response
 from app.db.database import check_db_health, get_db_path
 from app.agents.llm_gateway import LLMGateway
 
+from app.services.ledger_service import LedgerService
+
 router = APIRouter(tags=["Health & System"])
 
 @router.get("/health")
@@ -12,16 +14,28 @@ async def health_check():
     db_ok = await check_db_health()
     llm_configured = LLMGateway.is_configured()
     
-    status = "ok" if db_ok else "degraded"
+    try:
+        ledger_res = await LedgerService.verify_chain(None)
+        ledger_status = "verified" if ledger_res.get("valid") else "broken"
+    except Exception:
+        ledger_status = "unknown"
+
+    sandbox_mode = "docker" if settings.SANDBOX_ENABLED else ("host" if settings.PARIKSHIT_ENV == "development" else "disabled")
+    llm_mode = "mock" if settings.LLM_PROVIDER.lower() == "mock" else "real"
+    
+    status = "ok" if db_ok and ledger_status != "broken" else "degraded"
     
     return success_response({
         "status": status,
         "database": "ok" if db_ok else "unhealthy",
+        "ledger_status": ledger_status,
         "sandbox": "enabled" if settings.SANDBOX_ENABLED else "disabled (local fallback)",
+        "sandbox_mode": sandbox_mode,
         "llm_provider": settings.LLM_PROVIDER,
+        "llm_mode": llm_mode,
         "llm_ready": llm_configured,
         "environment": settings.PARIKSHIT_ENV,
-        "version": "2.0.0"
+        "version": settings.VERSION
     })
 
 @router.get("/metrics")

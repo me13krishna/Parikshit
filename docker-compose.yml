@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build:
@@ -7,10 +5,23 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - PARIKSHIT_DATA_DIR=/data
+      - PARIKSHIT_DB_URL=sqlite:////data/parikshit.db
+      - PARIKSHIT_ENV=development
+      - LLM_PROVIDER=mock
+      - SANDBOX_ENABLED=false
     volumes:
       - ./data:/data
-    env_file:
-      - .env
+      # To enable isolated Docker sandbox runs from inside the container,
+      # docker socket can be mounted (see docs/06_SECURITY_ERROR_LOGGING.md for rootless trade-offs):
+      # - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
   web:
@@ -20,7 +31,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped

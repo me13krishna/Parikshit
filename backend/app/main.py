@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         if not entries:
             await LedgerService.append_entry(
                 event_type="system_initialized",
-                payload={"version": "2.0.0", "message": "Parikshit Genesis Ledger Entry"}
+                payload={"version": settings.VERSION, "message": "Parikshit Genesis Ledger Entry"}
             )
     except Exception as e:
         logger.error(f"Error checking/initializing genesis ledger: {e}")
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Parikshit API",
-    version="2.0.0",
+    version=settings.VERSION,
     description="Grounded AI Engineering Teammate Backend (Team Vishwam)",
     lifespan=lifespan
 )
@@ -106,7 +106,7 @@ app.include_router(jobs_router, prefix="/api/v1")
 async def root():
     return {
         "name": "Parikshit Engine API",
-        "version": "2.0.0",
+        "version": settings.VERSION,
         "docs_url": "/docs",
         "health_url": "/api/v1/health"
     }

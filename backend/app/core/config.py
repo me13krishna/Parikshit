@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     PARIKSHIT_ENV: str = "development"
     PARIKSHIT_DATA_DIR: str = "./data"
     PARIKSHIT_DB_URL: str = "sqlite:///./data/parikshit.db"
+    VERSION: str = "2.1.0"
     PORT: int = 8000
     HOST: str = "0.0.0.0"
 
