@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Parikshit – AI Engineering Teammate",
   description: "An AI engineering teammate that moves developers from unfamiliar code to verified changes: understand → change → challenge → verify → prove.",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/parikshit_logo.jpg" alt="Parikshit Logo" width="160" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
+  <img src="docs/images/parikshit_logo.jpg" alt="Parikshit Logo" width="220" style="border-radius: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);" />
 </p>
 
 # Parikshit – AI Engineering Teammate
