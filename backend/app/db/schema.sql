@@ -292,8 +292,24 @@ CREATE INDEX IF NOT EXISTS idx_revisions_project ON repo_revisions(project_id);
 CREATE INDEX IF NOT EXISTS idx_files_revision ON files(revision_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_id);
-CREATE INDEX IF NOT EXISTS idx_ledger_project_seq ON ledger_entries(project_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+
+-- Ledger strict integrity: unique sequence per project and unique sequence for global chain
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_ledger_project_seq ON ledger_entries(project_id, sequence) WHERE project_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_ledger_global_seq ON ledger_entries(sequence) WHERE project_id IS NULL;
+
+-- Database-level immutability triggers for ledger_entries
+CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_no_update
+BEFORE UPDATE ON ledger_entries
+BEGIN
+    SELECT RAISE(ABORT, 'Ledger entries are strictly immutable and cannot be updated');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_no_delete
+BEFORE DELETE ON ledger_entries
+BEGIN
+    SELECT RAISE(ABORT, 'Ledger entries are strictly immutable and cannot be deleted');
+END;
 
 -- FTS5 Full-Text Search Virtual Table
 CREATE VIRTUAL TABLE IF NOT EXISTS fts_code USING fts5(

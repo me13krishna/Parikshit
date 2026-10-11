@@ -12,7 +12,11 @@ def get_db_path() -> str:
         path = Path(path_str)
         path.parent.mkdir(parents=True, exist_ok=True)
         return str(path)
-    return "./data/parikshit.db"
+    if "://" in db_url:
+        raise ValueError(f"Unsupported database URL scheme: {db_url}. Only sqlite:/// is supported.")
+    path = Path(db_url)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     db_path = get_db_path()

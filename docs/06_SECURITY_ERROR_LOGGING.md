@@ -61,6 +61,18 @@ docker run --rm \
 - Side-channel leakage via LLM provider (accepted risk; only public code is sent).
 - Physical access to the demo machine.
 
+### 1.5 What the Hash-Chained Ledger Does and Does Not Prove
+
+**What it guarantees:**
+- **Tamper-evidence against in-band modifications**: Any alteration, insertion, deletion, or reordering of historic entries breaks the SHA-256 hash chain and is immediately detected by `LedgerService.verify_chain()` and `scripts/verify_ledger.py`.
+- **Database-level immutability**: SQLite triggers (`trg_ledger_entries_no_update`, `trg_ledger_entries_no_delete`) block `UPDATE` and `DELETE` queries at the database engine level.
+- **Concurrent sequence safety**: Atomic `BEGIN IMMEDIATE` transactions and partial unique indexes `UNIQUE(project_id, sequence)` prevent sequence forks.
+- **Deterministic verification**: Storing canonical JSON strings eliminates re-serialization drift.
+
+**What it does NOT prove:**
+- An adversary with full, raw filesystem write access to the SQLite file (`parikshit.db`) could rewrite history and recalculate the entire chain from the modified entry forward.
+- **Recommendation for enterprise production**: Periodically anchor the latest head hash externally (e.g. publish to an RFC 3161 timestamping authority, signed Git commit tag, or append-only cloud storage).
+
 ---
 
 ## 2. Error Handling Strategy

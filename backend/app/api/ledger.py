@@ -23,17 +23,8 @@ async def verify_ledger(project_id: Optional[str] = None):
 
 @router.get("/ledger/export")
 async def export_evidence_pack(project_id: Optional[str] = None):
-    verification = await LedgerService.verify_chain(project_id=project_id)
-    entries = await LedgerService.list_entries(project_id=project_id, limit=1000)
-    
-    evidence_pack = {
-        "export_version": "2.0",
-        "project_id": project_id,
-        "verification_status": verification,
-        "total_entries": len(entries),
-        "ledger_entries": entries
-    }
-    return success_response(evidence_pack)
+    pack = await LedgerService.export_evidence_pack(project_id=project_id)
+    return success_response(pack)
 
 @router.get("/projects/{project_id}/ledger")
 async def get_project_ledger(
@@ -49,13 +40,5 @@ async def get_project_ledger(
 
 @router.get("/projects/{project_id}/ledger/export")
 async def export_project_ledger_pack(project_id: str):
-    verification = await LedgerService.verify_chain(project_id=project_id)
-    entries = await LedgerService.list_entries(project_id=project_id, limit=1000)
-    evidence_pack = {
-        "export_version": "2.0",
-        "project_id": project_id,
-        "verification_status": verification,
-        "total_entries": len(entries),
-        "ledger_entries": entries
-    }
-    return success_response(evidence_pack)
+    pack = await LedgerService.export_evidence_pack(project_id=project_id)
+    return success_response(pack)
