@@ -7,7 +7,7 @@ import re
 import json
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import aiosqlite
 
 from app.core.config import settings
@@ -132,6 +132,7 @@ class SandboxService:
                     "--network", "none",
                     "--memory", "512m",
                     "--cpus", "1.0",
+                    "--user", "1000:1000",
                     "-v", f"{workspace_path.resolve()}:/workspace",
                     "-w", "/workspace",
                     settings.SANDBOX_IMAGE,

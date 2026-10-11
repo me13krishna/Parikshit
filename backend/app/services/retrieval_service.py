@@ -1,9 +1,28 @@
+import re
 import aiosqlite
 from typing import List, Dict, Any, Optional
 from app.db.database import get_db_path
 from app.core.logging import logger
 
 class RetrievalService:
+    SECRET_PATTERNS = [
+        re.compile(r"AKIA[0-9A-Z]{16}"),
+        re.compile(r"(?i)(api[_-]?key|secret[_-]?key|token|password|auth[_-]?token|private[_-]?key)\s*[:=]\s*['\"][a-zA-Z0-9_\-\.]{8,}['\"]"),
+        re.compile(r"-----BEGIN [A-Z0-9_\- ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9_\- ]+PRIVATE KEY-----"),
+        re.compile(r"Bearer\s+[a-zA-Z0-9_\-\.]{16,}")
+    ]
+
+    @classmethod
+    def redact_secrets(cls, text: str) -> str:
+        """
+        Redacts common credentials, tokens, and private keys to protect against secret leakage in LLM contexts.
+        """
+        if not text:
+            return text
+        redacted = text
+        for pat in cls.SECRET_PATTERNS:
+            redacted = pat.sub("[REDACTED_SECRET]", redacted)
+        return redacted
     @classmethod
     async def retrieve(cls, revision_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
@@ -50,7 +69,7 @@ class RetrievalService:
                     "end_line": row["end_line"],
                     "kind": "symbol",
                     "name": row["name"],
-                    "content": snippet,
+                    "content": cls.redact_secrets(snippet),
                     "score": 1.0
                 })
 
@@ -79,7 +98,7 @@ class RetrievalService:
                                 "end_line": r["end_line"],
                                 "kind": "fts_match",
                                 "name": "",
-                                "content": r["content"],
+                                "content": cls.redact_secrets(r["content"]),
                                 "score": 0.8
                             })
                 except Exception as e:
@@ -106,7 +125,7 @@ class RetrievalService:
                         "end_line": r["end_line"],
                         "kind": "important_file",
                         "name": "",
-                        "content": r["content"],
+                        "content": cls.redact_secrets(r["content"]),
                         "score": 0.5
                     })
 

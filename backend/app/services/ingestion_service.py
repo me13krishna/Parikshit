@@ -4,6 +4,7 @@ import subprocess
 import uuid
 import hashlib
 import json
+import zipfile
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
@@ -158,14 +159,33 @@ class IngestionService:
         if dest_dir.exists():
             shutil.rmtree(dest_dir)
 
-        if src.is_dir():
+        if src.is_file() and (src.suffix.lower() == ".zip" or zipfile.is_zipfile(src)):
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(src, "r") as zf:
+                for member in zf.infolist():
+                    member_path = Path(member.filename)
+                    if member_path.is_absolute() or ".." in member_path.parts:
+                        raise AppError(
+                            f"Malicious ZIP archive: path traversal detected ({member.filename})",
+                            code="PATH_TRAVERSAL_DETECTED"
+                        )
+                    target = (dest_dir / member_path).resolve()
+                    try:
+                        target.relative_to(dest_dir.resolve())
+                    except ValueError:
+                        raise AppError(
+                            f"Malicious ZIP archive: path escapes destination ({member.filename})",
+                            code="PATH_TRAVERSAL_DETECTED"
+                        )
+                    zf.extract(member, dest_dir)
+        elif src.is_dir():
             shutil.copytree(
                 src,
                 dest_dir,
                 ignore=shutil.ignore_patterns(".git", "__pycache__", "node_modules", ".venv")
             )
         else:
-            raise AppError("ZIP extraction or single file import not supported in local copy helper", code="UNSUPPORTED_FORMAT")
+            raise AppError("Source must be a valid directory or .zip archive", code="UNSUPPORTED_FORMAT")
 
         # Compute content hash as commit SHA
         hasher = hashlib.sha256()

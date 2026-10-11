@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import aiosqlite
 
 from app.core.logging import logger
