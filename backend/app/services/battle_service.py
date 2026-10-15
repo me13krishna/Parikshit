@@ -32,11 +32,24 @@ class BattleService:
         db_path = get_db_path()
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute("SELECT * FROM tasks WHERE id = ?;", (task_id,))
-            task = await cursor.fetchone()
+            task = None
+            if task_id and task_id != "default":
+                cursor = await db.execute("SELECT * FROM tasks WHERE id = ?;", (task_id,))
+                task = await cursor.fetchone()
             if not task:
-                raise AppError(f"Task {task_id} not found", code="TASK_NOT_FOUND")
+                cursor = await db.execute(
+                    """
+                    SELECT t.* FROM tasks t
+                    JOIN workspaces w ON w.task_id = t.id
+                    JOIN patches p ON p.workspace_id = w.id
+                    ORDER BY t.created_at DESC LIMIT 1;
+                    """
+                )
+                task = await cursor.fetchone()
+            if not task:
+                raise AppError("No task with a generated patch found to battle against. Please run a task first.", code="TASK_NOT_FOUND")
 
+            task_id = task["id"]
             project_id = task["project_id"]
 
             wsp_cursor = await db.execute(
@@ -82,8 +95,13 @@ class BattleService:
             stem = Path(f).stem
             if not stem.startswith("test_") and stem != "__init__":
                 import_lines.append(f"import {stem}")
-        if len(import_lines) == 1 and (workspace_dir / "calculator.py").exists():
-            import_lines.append("from calculator import Calculator")
+        if len(import_lines) == 1:
+            py_candidates = [
+                p.stem for p in workspace_dir.glob("*.py")
+                if not p.name.startswith("test_") and not p.name.startswith("conftest") and p.name != "__init__.py"
+            ]
+            for pc in py_candidates[:2]:
+                import_lines.append(f"import {pc}")
         module_import_header = "\n".join(import_lines) + "\n\n"
 
         for round_num in range(1, max_rounds + 1):
@@ -254,9 +272,15 @@ Produce JSON:
 
             rounds_summary.append({
                 "round_number": round_num,
+                "round": round_num,
                 "adversary_challenge": adv_data,
                 "test_run": sandbox_run,
-                "reviewer": rev_data
+                "sandbox_exit_code": sandbox_run.get("exit_code", 0),
+                "sandbox_stdout": sandbox_run.get("stdout", ""),
+                "reviewer": rev_data,
+                "reviewer_verdict": rev_data.get("verdict", "approved_with_risks"),
+                "reviewer_summary": rev_data.get("summary", "Round review completed."),
+                "residual_risks": rev_data.get("residual_risks", [])
             })
 
             # Append round to Ledger

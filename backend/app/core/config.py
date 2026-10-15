@@ -11,10 +11,12 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
 
     # LLM Gateway
-    LLM_PROVIDER: str = "openai"  # openai | anthropic | mock
+    LLM_PROVIDER: str = "openai"  # openai | anthropic | huggingface | mock
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     ANTHROPIC_API_KEY: str = ""
+    HUGGINGFACE_API_KEY: str = ""
+    HUGGINGFACE_BASE_URL: str = "https://router.huggingface.co/hf-inference/v1"
     LLM_DEFAULT_MODEL: str = "gpt-4o-mini"
     LLM_BUILDER_MODEL: str = "gpt-4o"
     LLM_ADVERSARY_MODEL: str = "gpt-4o"

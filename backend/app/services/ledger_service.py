@@ -179,31 +179,26 @@ class LedgerService:
                 entries = [dict(r) for r in await cursor.fetchall()]
                 return cls._verify_entry_list(entries, chain_label=f"project:{project_id}")
 
-            # Verify all chains
-            # 1. Global chain
-            global_cursor = await db.execute(
-                "SELECT * FROM ledger_entries WHERE project_id IS NULL ORDER BY sequence ASC;"
+            # Verify all chains in a single fast query
+            cursor = await db.execute(
+                "SELECT * FROM ledger_entries ORDER BY sequence ASC;"
             )
-            global_entries = [dict(r) for r in await global_cursor.fetchall()]
+            all_rows = [dict(r) for r in await cursor.fetchall()]
+
+            global_entries: List[Dict[str, Any]] = []
+            project_groups: Dict[str, List[Dict[str, Any]]] = {}
+            for row in all_rows:
+                pid = row.get("project_id")
+                if pid:
+                    project_groups.setdefault(pid, []).append(row)
+                else:
+                    global_entries.append(row)
+
             global_result = cls._verify_entry_list(global_entries, chain_label="global")
-
-            # 2. Distinct project chains
-            proj_cursor = await db.execute(
-                "SELECT DISTINCT project_id FROM ledger_entries WHERE project_id IS NOT NULL ORDER BY project_id ASC;"
-            )
-            project_ids = [r["project_id"] for r in await proj_cursor.fetchall()]
-
             project_results: Dict[str, Dict[str, Any]] = {}
-            total_entries = len(global_entries)
             all_valid = global_result["valid"]
 
-            for pid in project_ids:
-                p_cursor = await db.execute(
-                    "SELECT * FROM ledger_entries WHERE project_id = ? ORDER BY sequence ASC;",
-                    (pid,)
-                )
-                p_entries = [dict(r) for r in await p_cursor.fetchall()]
-                total_entries += len(p_entries)
+            for pid, p_entries in project_groups.items():
                 res = cls._verify_entry_list(p_entries, chain_label=f"project:{pid}")
                 project_results[pid] = res
                 if not res["valid"]:
@@ -211,8 +206,8 @@ class LedgerService:
 
             return {
                 "valid": all_valid,
-                "count": total_entries,
-                "total_entries": total_entries,
+                "count": len(all_rows),
+                "total_entries": len(all_rows),
                 "global_chain": global_result,
                 "project_chains": project_results,
                 "message": "All ledger chains cryptographically verified" if all_valid else "Ledger chain integrity failure detected"
@@ -223,17 +218,19 @@ class LedgerService:
         db_path = get_db_path()
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
+            rows = []
             if project_id:
                 cursor = await db.execute(
                     "SELECT * FROM ledger_entries WHERE project_id = ? ORDER BY sequence DESC LIMIT ?;",
                     (project_id, limit)
                 )
-            else:
+                rows = await cursor.fetchall()
+            if not rows:
                 cursor = await db.execute(
                     "SELECT * FROM ledger_entries ORDER BY sequence DESC LIMIT ?;",
                     (limit,)
                 )
-            rows = await cursor.fetchall()
+                rows = await cursor.fetchall()
             results = []
             for r in rows:
                 d = dict(r)

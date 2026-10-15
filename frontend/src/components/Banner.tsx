@@ -25,20 +25,20 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
   };
 
   return (
-    <aside aria-label="System announcements" className="flex flex-col gap-1.5 w-full z-30">
+    <aside aria-label="System announcements" className="flex flex-col gap-1 w-full z-30 select-none">
       {/* Mock Mode Banner */}
       {isMock && (
-        <div className="bg-amber-950/70 border-b border-amber-600/40 text-amber-200 px-4 py-2 flex items-center justify-between text-xs font-mono shadow-inner backdrop-blur-sm">
+        <div className="bg-[#121720] border-b border-[#29313D] text-amber-200 px-4 py-2 flex items-center justify-between text-xs font-mono shadow-sm">
           <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+            <Sparkles className="w-4 h-4 text-[#C6F36B] shrink-0" />
             <span className="font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-[10px]">
               DEMO / MOCK MODE
             </span>
-            <span className="text-amber-300/90 hidden sm:inline">
+            <span className="text-[#929BAA] hidden sm:inline">
               LLM responses and code generations are running in deterministic mock mode. Zero external API costs.
             </span>
           </div>
-          <span className="text-amber-400/80 text-[10px]">provider: mock</span>
+          <span className="text-[#5E697A] text-[10px]">provider: mock</span>
         </div>
       )}
 
@@ -57,7 +57,7 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
         </div>
       )}
 
-      {/* Active Error Toast (Actionable, showing code, correlation_id, and copy action) */}
+      {/* Active Error Toast (Actionable with error code, correlation_id, and copy action) */}
       {error && (
         <div
           role="alert"
@@ -71,7 +71,7 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
                 {error.message}
               </div>
 
-              {/* Troubleshooting action recommendation */}
+              {/* Troubleshooting advice */}
               <div className="text-[11px] text-rose-300/90 font-sans">
                 {error.fixAdvice ||
                   "Check network connectivity to localhost:8000 or re-ingest the demo project."}
@@ -95,7 +95,7 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
                       title="Copy correlation ID for tracing"
                     >
                       {copiedCid ? (
-                        <Check className="w-3 h-3 text-emerald-400" />
+                        <Check className="w-3 h-3 text-[#39D98A]" />
                       ) : (
                         <Copy className="w-3 h-3" />
                       )}

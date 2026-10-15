@@ -68,43 +68,48 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 pb-16">
       {/* Header Context */}
-      <div className="flex items-center justify-between pb-3 border-b border-[rgba(159,176,204,0.12)]">
+      <div className="flex items-center justify-between pb-3 border-b border-[#29313D]">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-[rgba(147,144,251,0.12)] text-[var(--color-violet-400)]">
+          <div className="p-1.5 rounded-lg bg-[#191F2B] text-[#9390FB] border border-[#29313D]">
             <Swords className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-xs font-semibold text-[var(--color-text-100)] font-display">
-              Stage 3: Challenge
+            <h2 className="text-xs font-semibold text-[#F4F6FA] font-display">
+              AI Code Battle Arena
             </h2>
-            <p className="text-[11px] text-[var(--color-text-500)]">
-              Multi-agent stress tests: Builder, Adversary, and Reviewer lanes
+            <p className="text-[11px] text-[#929BAA]">
+              Adversarial multi-agent stress tests: Builder defends, Adversary attacks, Reviewer synthesizes
             </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#F4F6FA] bg-[#121720] px-2.5 py-1 rounded-md border border-[#29313D]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#9390FB]" />
+          <span>Stage 3: Challenge</span>
         </div>
       </div>
 
       {/* Battle Trigger & Control Card */}
-      <section className="rounded-2xl bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.16)] p-5 border-active-top flex flex-wrap items-center justify-between gap-4">
+      <section className="rounded-xl bg-[#121720] border border-[#29313D] p-5 border-active-top flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div>
-          <h3 className="text-xs font-semibold text-[var(--color-text-100)] font-display">
-            AI vs AI Battle Arena
+          <h3 className="text-xs font-semibold text-[#F4F6FA] font-display">
+            Multi-Agent Adversarial Challenge
           </h3>
-          <p className="text-[11px] text-[var(--color-text-300)] mt-0.5">
+          <p className="text-[11px] text-[#929BAA] mt-0.5">
             Builder Agent defends the patch; Adversary Agent writes ruthless stress tests; Reviewer Agent synthesizes residual risks.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-text-300)]">
+          <div className="flex items-center gap-2 font-mono text-xs text-[#929BAA]">
             <span>Rounds:</span>
             <select
               value={roundsToRun}
               onChange={(e) => setRoundsToRun(Number(e.target.value))}
               aria-label="Number of battle rounds"
-              className="bg-[var(--color-ink-950)] border border-[rgba(159,176,204,0.2)] rounded-lg px-2.5 py-1 text-[var(--color-text-100)] text-xs focus:ring-2 focus:ring-[var(--color-cyan-300)] focus:outline-none"
+              className="bg-[#0B0D12] border border-[#29313D] rounded-lg px-2.5 py-1 text-[#F4F6FA] text-xs focus:outline-none focus:border-[#C6F36B]"
             >
               <option value={1}>1 Round</option>
               <option value={2}>2 Rounds</option>
@@ -115,12 +120,12 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
           <button
             onClick={handleStartBattle}
             disabled={!taskId || loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-violet-400)] hover:bg-[var(--color-violet-400)]/80 disabled:bg-[var(--color-ink-800)] text-[var(--color-ink-950)] text-xs font-semibold transition-all shadow-md shadow-[rgba(147,144,251,0.25)] shrink-0"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#9390FB] hover:bg-[#827ef5] disabled:opacity-50 text-[#0B0D12] text-xs font-semibold transition-all shadow-md shrink-0"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-[var(--color-ink-950)]" />
-                <span>Simulating Multi-Agent Battle...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-[#0B0D12]" />
+                <span>Simulating Battle...</span>
               </>
             ) : (
               <>
@@ -132,32 +137,32 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
         </div>
       </section>
 
-      {/* Screen Reader Live Progress Announcement */}
+      {/* Screen Reader Announcement */}
       <div aria-live="polite" className="sr-only">
         {loading && (activeStepText || "Battle arena simulation in progress...")}
       </div>
 
-      {/* Empty State before Battle */}
+      {/* Empty State before Battle (Required exact strings for EmptyStates.test.tsx) */}
       {!report && !loading && (
-        <div className="p-8 text-center rounded-2xl border border-[rgba(159,176,204,0.12)] bg-[var(--color-ink-900)]/40 text-[var(--color-text-500)] text-xs space-y-3">
-          <Swords className="w-8 h-8 text-[var(--color-violet-400)] mx-auto opacity-60" />
+        <div className="p-10 text-center rounded-xl border border-[#29313D] bg-[#121720]/40 text-[#929BAA] text-xs space-y-3">
+          <Swords className="w-8 h-8 text-[#9390FB] mx-auto opacity-60" />
           <div>
-            <p className="font-semibold text-[var(--color-text-100)]">No battles executed yet.</p>
-            <p className="text-[11px] text-[var(--color-text-300)] mt-1 max-w-md mx-auto">
+            <p className="font-semibold text-[#F4F6FA]">No battles executed yet.</p>
+            <p className="text-[11px] text-[#5E697A] mt-1 max-w-md mx-auto">
               Run a battle to challenge this patch with adversarial stress tests before advancing to verification.
             </p>
           </div>
           {taskId && (
             <button
               onClick={handleStartBattle}
-              className="px-4 py-2 rounded-xl bg-[var(--color-ink-800)] hover:bg-[var(--color-ink-800)]/80 text-[var(--color-cyan-300)] text-xs font-medium border border-[rgba(106,215,250,0.3)] transition-colors"
+              className="px-4 py-2 rounded-lg bg-[#191F2B] hover:bg-[#222B3D] text-[#C6F36B] text-xs font-semibold border border-[#29313D] transition-colors"
             >
               Start Battle Challenge Now
             </button>
           )}
           {!taskId && (
-            <p className="text-[11px] text-[var(--color-text-500)] font-mono">
-              (Navigate to Stage 2: Change to create and build a task first.)
+            <p className="text-[11px] text-[#5E697A] font-mono">
+              (Navigate to Stage 2: Build to create a task first.)
             </p>
           )}
         </div>
@@ -165,20 +170,20 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
 
       {/* Battle Results Display */}
       {report && (
-        <div className="space-y-6">
-          {/* Prominent Final Reviewer Verdict Card */}
-          <section className="p-5 rounded-2xl bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.2)] flex flex-wrap items-center justify-between gap-4 border-active-top shadow-xl">
+        <div className="space-y-5 animate-in fade-in">
+          {/* Final Reviewer Verdict Card */}
+          <section className="p-5 rounded-xl bg-[#121720] border border-[#29313D] flex flex-wrap items-center justify-between gap-4 border-active-top shadow-xl">
             <div className="flex items-center gap-3.5">
-              <div className="p-2.5 rounded-xl bg-[rgba(106,215,250,0.12)] text-[var(--color-cyan-300)]">
+              <div className="p-2.5 rounded-lg bg-[#0B0D12] text-[#C6F36B] border border-[#29313D]">
                 <UserCheck className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[11px] font-mono text-[var(--color-text-500)]">
+                <span className="text-[11px] font-mono text-[#5E697A]">
                   Reviewer Final Verdict
                 </span>
-                <div className="text-base font-bold font-display text-[var(--color-text-100)] mt-0.5 flex items-center gap-2">
+                <div className="text-sm font-bold font-display text-[#F4F6FA] mt-0.5 flex items-center gap-2">
                   <span>{report.final_verdict?.toUpperCase() || "APPROVED"}</span>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="w-4 h-4 text-[#39D98A]" />
                 </div>
               </div>
             </div>
@@ -190,8 +195,8 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
                   <span>{report.residual_risks.length} Residual Risk(s) Logged</span>
                 </div>
               ) : (
-                <div className="text-emerald-300 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1 rounded-full flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <div className="text-[#39D98A] bg-emerald-950/40 border border-emerald-800/40 px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#39D98A]" />
                   <span>Zero High Risks</span>
                 </div>
               )}
@@ -206,32 +211,32 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
 
           {/* Three Agent Lanes Legend */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-[var(--color-ink-900)] border-l-4 border-l-[var(--color-blue-500)] border border-[rgba(159,176,204,0.1)]">
-              <div className="font-semibold text-[var(--color-blue-500)] flex items-center gap-1.5">
+            <div className="p-3.5 rounded-lg bg-[#121720] border-l-4 border-l-[#C6F36B] border border-[#29313D]">
+              <div className="font-semibold text-[#C6F36B] flex items-center gap-1.5">
                 <Hammer className="w-3.5 h-3.5" />
                 <span>Builder Agent</span>
               </div>
-              <p className="text-[11px] text-[var(--color-text-500)] mt-0.5">
+              <p className="text-[11px] text-[#929BAA] mt-0.5">
                 Defends patch logic & executes fixes
               </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-[var(--color-ink-900)] border-l-4 border-l-[var(--color-violet-400)] border border-[rgba(159,176,204,0.1)]">
-              <div className="font-semibold text-[var(--color-violet-400)] flex items-center gap-1.5">
+            <div className="p-3.5 rounded-lg bg-[#121720] border-l-4 border-l-[#9390FB] border border-[#29313D]">
+              <div className="font-semibold text-[#9390FB] flex items-center gap-1.5">
                 <Swords className="w-3.5 h-3.5" />
                 <span>Adversary Agent</span>
               </div>
-              <p className="text-[11px] text-[var(--color-text-500)] mt-0.5">
+              <p className="text-[11px] text-[#929BAA] mt-0.5">
                 Attacks with edge tests & boundary traps
               </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-[var(--color-ink-900)] border-l-4 border-l-[var(--color-cyan-300)] border border-[rgba(159,176,204,0.1)]">
-              <div className="font-semibold text-[var(--color-cyan-300)] flex items-center gap-1.5">
+            <div className="p-3.5 rounded-lg bg-[#121720] border-l-4 border-l-[#39D98A] border border-[#29313D]">
+              <div className="font-semibold text-[#39D98A] flex items-center gap-1.5">
                 <UserCheck className="w-3.5 h-3.5" />
                 <span>Reviewer Agent</span>
               </div>
-              <p className="text-[11px] text-[var(--color-text-500)] mt-0.5">
+              <p className="text-[11px] text-[#929BAA] mt-0.5">
                 Synthesizes residual risks & issues verdict
               </p>
             </div>
@@ -242,21 +247,21 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
             {report.rounds.map((rnd, idx) => (
               <section
                 key={idx}
-                className="rounded-2xl border border-[rgba(159,176,204,0.16)] bg-[var(--color-ink-950)] p-5 space-y-4 shadow-lg"
+                className="rounded-xl border border-[#29313D] bg-[#121720] p-5 space-y-4 shadow-lg"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-[rgba(159,176,204,0.12)]">
+                <div className="flex items-center justify-between pb-3 border-b border-[#29313D]">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[var(--color-cyan-300)]">
+                    <span className="text-xs font-mono font-bold text-[#C6F36B]">
                       Round #{rnd.round || idx + 1}
                     </span>
-                    <span className="text-[11px] text-[var(--color-text-500)]">Arena Exchange</span>
+                    <span className="text-[11px] text-[#929BAA]">Adversarial Exchange</span>
                   </div>
 
                   <span
                     className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${
                       rnd.sandbox_exit_code === 0
-                        ? "bg-emerald-950/60 text-emerald-300 border-emerald-800/40"
-                        : "bg-rose-950/60 text-rose-300 border-rose-800/40"
+                        ? "bg-emerald-950/60 text-[#39D98A] border-emerald-800/40"
+                        : "bg-rose-950/60 text-[#FB7185] border-rose-800/40"
                     }`}
                   >
                     Sandbox: {rnd.sandbox_exit_code === 0 ? "Tests Passed" : "Challenge Failed"}
@@ -265,44 +270,44 @@ export const BattleReport: React.FC<BattleReportProps> = ({ taskId, onError }) =
 
                 {/* 2-Column Split: Adversary Attack vs Reviewer Synthesis */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Adversary Column (violet-400 theme) */}
-                  <div className="p-4 rounded-xl bg-[var(--color-ink-900)] border border-[rgba(147,144,251,0.25)] space-y-2.5">
+                  {/* Adversary Column */}
+                  <div className="p-4 rounded-lg bg-[#0B0D12] border border-[#9390FB]/30 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[var(--color-violet-400)] font-semibold text-xs flex items-center gap-1.5">
+                      <span className="text-[#9390FB] font-semibold text-xs flex items-center gap-1.5">
                         <Swords className="w-3.5 h-3.5" />
                         <span>Adversary Attack Vector</span>
                       </span>
                       {renderSeverityBadge(rnd.adversary_challenge.severity)}
                     </div>
 
-                    <div className="text-xs font-semibold text-[var(--color-text-100)]">
+                    <div className="text-xs font-semibold text-[#F4F6FA]">
                       {rnd.adversary_challenge.challenge_title}
                     </div>
-                    <p className="text-[11px] text-[var(--color-text-300)] leading-relaxed">
+                    <p className="text-[11px] text-[#929BAA] leading-relaxed">
                       {rnd.adversary_challenge.challenge_description}
                     </p>
 
                     {rnd.adversary_challenge.suggested_test && (
-                      <div className="pt-2 border-t border-[rgba(159,176,204,0.1)] text-[10px] text-[var(--color-text-500)] font-mono">
+                      <div className="pt-2 border-t border-[#29313D] text-[10px] text-[#5E697A] font-mono">
                         Target test: <code>{rnd.adversary_challenge.suggested_test}</code>
                       </div>
                     )}
                   </div>
 
-                  {/* Reviewer Column (cyan-300 theme) */}
-                  <div className="p-4 rounded-xl bg-[var(--color-ink-900)] border border-[rgba(106,215,250,0.25)] space-y-2.5">
-                    <span className="text-[var(--color-cyan-300)] font-semibold text-xs flex items-center gap-1.5">
+                  {/* Reviewer Column */}
+                  <div className="p-4 rounded-lg bg-[#0B0D12] border border-[#39D98A]/30 space-y-2">
+                    <span className="text-[#39D98A] font-semibold text-xs flex items-center gap-1.5">
                       <UserCheck className="w-3.5 h-3.5" />
                       <span>Reviewer Synthesis</span>
                     </span>
 
-                    <p className="text-xs text-[var(--color-text-100)] leading-relaxed">
+                    <p className="text-xs text-[#F4F6FA] leading-relaxed">
                       {rnd.reviewer_summary}
                     </p>
 
                     {rnd.residual_risks && rnd.residual_risks.length > 0 && (
-                      <div className="pt-2 border-t border-[rgba(159,176,204,0.1)]">
-                        <span className="text-[10px] font-mono text-[var(--color-text-500)] block mb-1">
+                      <div className="pt-2 border-t border-[#29313D]">
+                        <span className="text-[10px] font-mono text-[#5E697A] block mb-1">
                           Residual Risks:
                         </span>
                         <ul className="space-y-1 text-[11px] text-amber-300/90 font-sans">

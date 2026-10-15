@@ -6,16 +6,9 @@ from pathlib import Path
 
 from app.core.errors import success_response, error_response
 from app.db.database import get_db_path
-from app.services.ingestion_service import IngestionService
-from app.services.indexer_service import IndexerService
 from app.services.mentor_service import MentorService
 
 router = APIRouter(tags=["Codebase Mentor"])
-
-class IngestRequest(BaseModel):
-    source_type: str = "git_url"  # git_url | local | zip
-    source_uri: str
-    name: Optional[str] = None
 
 class ChatRequest(BaseModel):
     question: str
@@ -28,35 +21,57 @@ class MentorDirectChatRequest(BaseModel):
     session_id: Optional[str] = None
     conversation_id: Optional[str] = None
 
-@router.post("/projects/ingest")
-@router.post("/projects")
-async def ingest_and_index(req: IngestRequest):
-    # 1. Ingestion
-    ingest_res = await IngestionService.ingest_repository(
-        source_type=req.source_type,
-        source_uri=req.source_uri,
-        name=req.name
-    )
 
-    # 2. Immediate Indexing
-    index_res = await IndexerService.index_revision(ingest_res["revision_id"])
 
-    return success_response({
-        **ingest_res,
-        "indexing": index_res
-    }, status_code=201)
-
-@router.get("/{project_id}/overview")
-@router.get("/projects/{project_id}/overview")
-async def get_overview(project_id: str):
+@router.post("/mentor/chat")
+async def direct_mentor_chat(req: MentorDirectChatRequest):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
-            (project_id,)
-        )
-        rev = await cursor.fetchone()
+        rev = None
+        if req.revision_id:
+            cursor = await db.execute("SELECT id, project_id FROM repo_revisions WHERE id = ?;", (req.revision_id,))
+            rev = await cursor.fetchone()
+        if not rev and req.project_id:
+            cursor = await db.execute("SELECT id, project_id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;", (req.project_id,))
+            rev = await cursor.fetchone()
+        if not rev:
+            cursor = await db.execute("SELECT id, project_id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
+            rev = await cursor.fetchone()
+        if not rev:
+            return error_response("No indexed revision found for project", code="NOT_FOUND", status_code=404)
+
+        rev_id = rev["id"]
+        proj_id = rev["project_id"]
+
+    answer = await MentorService.ask_mentor(
+        project_id=proj_id,
+        revision_id=rev_id,
+        question=req.question,
+        conversation_id=req.session_id or req.conversation_id
+    )
+    return success_response(answer)
+
+@router.get("/mentor/overview")
+@router.get("/{project_id}/overview")
+@router.get("/projects/{project_id}/overview")
+async def get_overview(
+    project_id: Optional[str] = None,
+    revision_id: Optional[str] = Query(None)
+):
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        rev = None
+        if revision_id:
+            cursor = await db.execute("SELECT id FROM repo_revisions WHERE id = ?;", (revision_id,))
+            rev = await cursor.fetchone()
+        if not rev and project_id:
+            cursor = await db.execute("SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;", (project_id,))
+            rev = await cursor.fetchone()
+        if not rev:
+            cursor = await db.execute("SELECT id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
+            rev = await cursor.fetchone()
         if not rev:
             return error_response("No revision found for project", code="NOT_FOUND", status_code=404)
 
@@ -70,34 +85,50 @@ async def chat_mentor(project_id: str, req: ChatRequest):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
-            (project_id,)
-        )
-        rev = await cursor.fetchone()
+        rev = None
+        if project_id:
+            cursor = await db.execute(
+                "SELECT id, project_id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
+                (project_id,)
+            )
+            rev = await cursor.fetchone()
+        if not rev:
+            cursor = await db.execute("SELECT id, project_id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
+            rev = await cursor.fetchone()
         if not rev:
             return error_response("No indexed revision found for project", code="NOT_FOUND", status_code=404)
 
         rev_id = rev["id"]
+        actual_pid = rev["project_id"]
 
     answer = await MentorService.ask_mentor(
-        project_id=project_id,
+        project_id=actual_pid,
         revision_id=rev_id,
         question=req.question,
         conversation_id=req.conversation_id
     )
     return success_response(answer)
 
+@router.get("/mentor/tours")
 @router.get("/{project_id}/tours")
-async def get_tours(project_id: str):
+@router.get("/projects/{project_id}/tours")
+async def get_tours(
+    project_id: Optional[str] = None,
+    revision_id: Optional[str] = Query(None)
+):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
-            (project_id,)
-        )
-        rev = await cursor.fetchone()
+        rev = None
+        if revision_id:
+            cursor = await db.execute("SELECT id FROM repo_revisions WHERE id = ?;", (revision_id,))
+            rev = await cursor.fetchone()
+        if not rev and project_id:
+            cursor = await db.execute("SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;", (project_id,))
+            rev = await cursor.fetchone()
+        if not rev:
+            cursor = await db.execute("SELECT id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
+            rev = await cursor.fetchone()
         if not rev:
             return error_response("No revision found for project", code="NOT_FOUND", status_code=404)
         rev_id = rev["id"]
@@ -106,10 +137,20 @@ async def get_tours(project_id: str):
     return success_response({"tours": tours})
 
 @router.get("/{project_id}/files")
+@router.get("/projects/{project_id}/files")
 async def list_files(project_id: str):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
+        rev = None
+        if project_id:
+            cursor = await db.execute("SELECT id, project_id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;", (project_id,))
+            rev = await cursor.fetchone()
+        if not rev:
+            cursor = await db.execute("SELECT id, project_id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
+            rev = await cursor.fetchone()
+        
+        target_pid = rev["project_id"] if rev else project_id
         cursor = await db.execute(
             """
             SELECT f.id, f.path, f.language, f.kind, f.line_count, f.size_bytes, f.importance_score
@@ -118,7 +159,7 @@ async def list_files(project_id: str):
             WHERE r.project_id = ?
             ORDER BY f.importance_score DESC, f.path ASC;
             """,
-            (project_id,)
+            (target_pid,)
         )
         rows = await cursor.fetchall()
         files = [dict(r) for r in rows]
@@ -126,6 +167,7 @@ async def list_files(project_id: str):
     return success_response({"files": files, "count": len(files)})
 
 @router.get("/{project_id}/file-content")
+@router.get("/projects/{project_id}/file-content")
 async def get_file_content(
     project_id: str,
     path: str,
@@ -135,11 +177,18 @@ async def get_file_content(
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT storage_path FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
-            (project_id,)
-        )
-        rev = await cursor.fetchone()
+        rev = None
+        if project_id:
+            cursor = await db.execute(
+                "SELECT storage_path FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
+                (project_id,)
+            )
+            rev = await cursor.fetchone()
+        if not rev:
+            cursor = await db.execute(
+                "SELECT storage_path FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;"
+            )
+            rev = await cursor.fetchone()
         if not rev:
             return error_response("Project revision not found", code="NOT_FOUND", status_code=404)
 

@@ -23,11 +23,23 @@ class RetrievalService:
         for pat in cls.SECRET_PATTERNS:
             redacted = pat.sub("[REDACTED_SECRET]", redacted)
         return redacted
+    @staticmethod
+    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+        if not a or not b or len(a) != len(b):
+            return 0.0
+        dot = sum(x * y for x, y in zip(a, b))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(y * y for y in b) ** 0.5
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return dot / (norm_a * norm_b)
+
     @classmethod
     async def retrieve(cls, revision_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
-        Hybrid search combining FTS5 full-text matching and symbol definitions.
-        Returns ranked code excerpts with file path, line numbers, and snippet content.
+        Hybrid search combining FTS5 full-text matching, symbol definitions,
+        and semantic vector embedding re-ranking.
+        Returns ranked code excerpts with file path, line numbers, snippet content, and scores.
         """
         db_path = get_db_path()
         results: List[Dict[str, Any]] = []
@@ -128,5 +140,21 @@ class RetrievalService:
                         "content": cls.redact_secrets(r["content"]),
                         "score": 0.5
                     })
+
+        # 4. Dense semantic vector re-ranking
+        if results and clean_query:
+            try:
+                from app.agents.llm_gateway import LLMGateway
+                texts_to_embed = [clean_query] + [r["content"][:400] for r in results]
+                embeddings = await LLMGateway.embed_text(texts_to_embed)
+                if len(embeddings) == len(texts_to_embed):
+                    q_vec = embeddings[0]
+                    for idx, r in enumerate(results):
+                        sim = cls._cosine_similarity(q_vec, embeddings[idx + 1])
+                        # Blended score: 60% lexical/symbol score + 40% dense semantic similarity
+                        r["score"] = round(0.6 * r["score"] + 0.4 * max(0.0, sim), 3)
+                    results.sort(key=lambda x: x["score"], reverse=True)
+            except Exception as e:
+                logger.debug(f"Semantic re-ranking note: {e}")
 
         return results[:limit]

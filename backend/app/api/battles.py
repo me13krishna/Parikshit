@@ -15,6 +15,25 @@ router = APIRouter(tags=["AI vs AI Battle & Self-Healing"])
 class StartBattleRequest(BaseModel):
     max_rounds: int = 2
 
+class DirectBattleRequest(BaseModel):
+    task_id: Optional[str] = None
+    max_rounds: int = 2
+
+class DirectHealRequest(BaseModel):
+    run_id: Optional[str] = None
+    max_attempts: int = 2
+
+@router.post("/battles/run")
+async def run_battle_direct(req: DirectBattleRequest):
+    report = await BattleService.run_battle(req.task_id or "default", max_rounds=req.max_rounds)
+    return success_response(report, status_code=200)
+
+@router.post("/healing/diagnose")
+@router.post("/healing/heal")
+async def diagnose_direct(req: DirectHealRequest):
+    result = await SelfHealingService.heal_failure(req.run_id or "default", max_attempts=req.max_attempts)
+    return success_response(result, status_code=200)
+
 @router.post("/tasks/{task_id}/battles")
 async def start_battle(task_id: str, req: StartBattleRequest):
     report = await BattleService.run_battle(task_id, max_rounds=req.max_rounds)

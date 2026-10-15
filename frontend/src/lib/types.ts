@@ -190,10 +190,24 @@ export interface HealResult {
 export interface TwinNode {
   id: string;
   label: string;
-  type: "file" | "class" | "function";
+  path?: string;
+  kind?: string;
+  type?: "file" | "class" | "function" | string;
+  language?: string;
+  importance?: number;
   lines?: number;
   callers?: string[];
   callees?: string[];
+}
+
+export interface TwinEdge {
+  id?: string;
+  source: string;
+  target: string;
+  from?: string;
+  to?: string;
+  type?: string;
+  label?: string;
 }
 
 export interface TwinImpact {
