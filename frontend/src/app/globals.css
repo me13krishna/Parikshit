@@ -1,56 +1,116 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink-950: #00030f;
-  --color-ink-900: #060b1e;
-  --color-ink-800: #0d1430;
-  --color-glow-indigo: #140756;
-  --color-blue-500: #076cd3;
-  --color-indigo-500: #2e38de;
-  --color-sky-400: #39aaf0;
-  --color-cyan-300: #6ad7fa;
-  --color-teal-400: #2dd4c0;
-  --color-violet-400: #9390fb;
-  --color-lavender-300: #ad81db;
-  --color-text-100: #e8f4fa;
-  --color-text-300: #9fb0cc;
-  --color-text-500: #6b7a99;
+  --color-bg-primary: #0B0D12;
+  --color-surface-1: #121720;
+  --color-surface-2: #191F2B;
+  --color-surface-3: #222B3D;
+  
+  --color-accent-lime: #C6F36B;
+  --color-accent-emerald: #39D98A;
+  --color-accent-cyan: #6AD7FA;
+  --color-accent-blue: #076CD3;
+  --color-accent-violet: #9390FB;
+  --color-accent-amber: #FBBF24;
+  --color-accent-rose: #FB7185;
 
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-danger: #fb7185;
+  --color-text-primary: #F4F6FA;
+  --color-text-secondary: #929BAA;
+  --color-text-muted: #5E697A;
+
+  --color-border-subtle: #29313D;
+  --color-border-hover: #3B4656;
+  --color-border-accent: #C6F36B;
+
+  /* Legacy aliases for backward compatibility */
+  --color-ink-950: #0B0D12;
+  --color-ink-900: #121720;
+  --color-ink-800: #191F2B;
+  --color-glow-indigo: #140756;
+  --color-blue-500: #076CD3;
+  --color-indigo-500: #2E38DE;
+  --color-sky-400: #38BDF8;
+  --color-cyan-300: #6AD7FA;
+  --color-teal-400: #39D98A;
+  --color-violet-400: #9390FB;
+  --color-lavender-300: #AD81DB;
+  --color-text-100: #F4F6FA;
+  --color-text-300: #929BAA;
+  --color-text-500: #5E697A;
+
+  --color-success: #39D98A;
+  --color-warning: #FBBF24;
+  --color-danger: #FB7185;
 
   --font-display: var(--font-sora), sans-serif;
   --font-sans: var(--font-instrument), sans-serif;
   --font-mono: var(--font-mono), monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
 }
 
 :root {
   --font-sora: 'Sora', sans-serif;
   --font-instrument: 'Instrument Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --grad-ring: linear-gradient(135deg, #2dd4c0 0%, #076cd3 40%, #9390fb 75%, #ad81db 100%);
-  --grad-ribbon: linear-gradient(135deg, #6ad7fa 0%, #076cd3 55%, #2e38de 100%);
-  --grad-panel-top: linear-gradient(90deg, #2dd4c0, #076cd3, #9390fb);
-  --grad-ambient: radial-gradient(circle at 92% 8%, rgba(20, 7, 86, 0.45) 0%, transparent 40%),
-                  radial-gradient(circle at 6% 92%, rgba(21, 12, 73, 0.50) 0%, transparent 45%);
+  
+  --bg-primary: #0B0D12;
+  --surface-1: #121720;
+  --surface-2: #191F2B;
+  --surface-3: #222B3D;
+  --border-subtle: #29313D;
+  --border-hover: #3B4656;
+  --text-primary: #F4F6FA;
+  --text-secondary: #929BAA;
+  --text-muted: #5E697A;
+  --accent-lime: #C6F36B;
+  --accent-emerald: #39D98A;
+
+  --grad-ring: linear-gradient(135deg, #39D98A 0%, #076CD3 50%, #C6F36B 100%);
+  --grad-lime: linear-gradient(135deg, #C6F36B 0%, #39D98A 100%);
+  --grad-ambient: radial-gradient(circle at 90% 10%, rgba(198, 243, 107, 0.03) 0%, transparent 40%),
+                  radial-gradient(circle at 10% 90%, rgba(57, 217, 138, 0.03) 0%, transparent 45%);
+}
+
+/* Light Theme Variables */
+html.light {
+  --bg-primary: #F8FAFC;
+  --surface-1: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --surface-3: #E2E8F0;
+  --border-subtle: #E2E8F0;
+  --border-hover: #CBD5E1;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --accent-lime: #4D7C0F;
+  --accent-emerald: #15803D;
+
+  --color-ink-950: #F8FAFC;
+  --color-ink-900: #FFFFFF;
+  --color-ink-800: #F1F5F9;
+  --color-text-100: #0F172A;
+  --color-text-300: #475569;
+  --color-text-500: #64748B;
+
+  --grad-ambient: radial-gradient(circle at 90% 10%, rgba(198, 243, 107, 0.08) 0%, transparent 30%),
+                  radial-gradient(circle at 10% 90%, rgba(57, 217, 138, 0.08) 0%, transparent 35%);
 }
 
 @layer base {
   body {
-    background-color: var(--color-ink-950);
+    background-color: var(--bg-primary);
     background-image: var(--grad-ambient);
     background-attachment: fixed;
-    color: var(--color-text-100);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -61,33 +121,32 @@
     font-family: var(--font-mono);
   }
 
-  /* Accessible high-contrast focus outline */
   :focus-visible {
-    outline: 2px solid var(--color-cyan-300);
+    outline: 2px solid var(--color-accent-lime);
     outline-offset: 2px;
   }
 }
 
-/* Custom scrollbars */
+/* Custom developer scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-ink-950);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(159, 176, 204, 0.2);
+  background: rgba(146, 155, 170, 0.22);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(159, 176, 204, 0.35);
+  background: rgba(146, 155, 170, 0.4);
 }
 
-/* Active panel top gradient accent */
+/* Restrained Lime Accent Top Border */
 .border-active-top {
   position: relative;
 }
@@ -98,26 +157,26 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: var(--grad-ring);
+  height: 1.5px;
+  background: var(--grad-lime);
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
 }
 
-/* Subtle ring orb animations */
-@keyframes orb-pulse {
+/* Subtle Lime Orb Animations */
+@keyframes lime-glow {
   0%, 100% {
+    opacity: 0.6;
     transform: scale(1);
-    opacity: 0.85;
   }
   50% {
-    transform: scale(1.15);
     opacity: 1;
+    transform: scale(1.08);
   }
 }
 
-.animate-orb {
-  animation: orb-pulse 2.5s ease-in-out infinite;
+.animate-lime-glow {
+  animation: lime-glow 3s ease-in-out infinite;
 }
 
 /* Motion accessibility overrides */
@@ -131,7 +190,7 @@
     scroll-behavior: auto !important;
   }
 
-  .animate-orb,
+  .animate-lime-glow,
   .animate-spin,
   .animate-pulse {
     animation: none !important;

@@ -13,6 +13,22 @@ from app.core.logging import logger
 from app.db.database import get_db_path
 from app.services.ledger_service import LedgerService
 
+_TS_PY_PARSER = None
+_TS_JS_PARSER = None
+
+def _get_ts_parsers():
+    global _TS_PY_PARSER, _TS_JS_PARSER
+    if _TS_PY_PARSER is None or _TS_JS_PARSER is None:
+        try:
+            from tree_sitter import Language, Parser
+            import tree_sitter_python as tspy
+            import tree_sitter_javascript as tsjs
+            _TS_PY_PARSER = Parser(Language(tspy.language()))
+            _TS_JS_PARSER = Parser(Language(tsjs.language()))
+        except Exception as e:
+            logger.debug(f"Tree-sitter parser initialization deferred or unavailable: {e}")
+    return _TS_PY_PARSER, _TS_JS_PARSER
+
 class IndexerService:
     @classmethod
     async def index_revision(cls, revision_id: str) -> Dict[str, Any]:
@@ -202,47 +218,175 @@ class IndexerService:
         symbols = []
         imports = []
 
+        py_parser, js_parser = _get_ts_parsers()
+
         if lang == "python":
-            try:
-                tree = ast.parse(content)
-                for node in ast.walk(tree):
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        start = node.lineno
-                        end = getattr(node, "end_lineno", start + len(node.body))
-                        snippet = "\n".join(lines[start - 1 : end])
-                        doc = ast.get_docstring(node)
-                        sig = f"def {node.name}(...)"
-                        symbols.append({"name": node.name, "kind": "function", "start_line": start, "end_line": end, "signature": sig, "docstring": doc})
-                        chunks.append({"start_line": start, "end_line": end, "content": snippet})
+            parsed_with_ts = False
+            if py_parser is not None:
+                try:
+                    tree = py_parser.parse(content.encode("utf-8"))
+                    for node in tree.root_node.children:
+                        if node.type in ("function_definition", "class_definition"):
+                            name_node = node.child_by_field_name("name")
+                            if name_node:
+                                sym_name = name_node.text.decode("utf-8")
+                                start = node.start_point.row + 1
+                                end = node.end_point.row + 1
+                                kind = "function" if node.type == "function_definition" else "class"
+                                sig = f"def {sym_name}(...)" if kind == "function" else f"class {sym_name}"
+                                snippet = "\n".join(lines[start - 1 : end])
+                                symbols.append({
+                                    "name": sym_name,
+                                    "kind": kind,
+                                    "start_line": start,
+                                    "end_line": end,
+                                    "signature": sig,
+                                    "docstring": None
+                                })
+                                chunks.append({"start_line": start, "end_line": end, "content": snippet})
 
-                    elif isinstance(node, ast.ClassDef):
-                        start = node.lineno
-                        end = getattr(node, "end_lineno", start + len(node.body))
-                        snippet = "\n".join(lines[start - 1 : end])
-                        doc = ast.get_docstring(node)
-                        symbols.append({"name": node.name, "kind": "class", "start_line": start, "end_line": end, "signature": f"class {node.name}", "docstring": doc})
-                        chunks.append({"start_line": start, "end_line": end, "content": snippet})
+                        elif node.type == "import_statement":
+                            for ch in node.children:
+                                if ch.type == "dotted_name":
+                                    imports.append(ch.text.decode("utf-8"))
+                        elif node.type == "import_from_statement":
+                            mod = node.child_by_field_name("module_name")
+                            if mod:
+                                imports.append(mod.text.decode("utf-8"))
+                    parsed_with_ts = True
+                except Exception as e:
+                    logger.debug(f"Tree-sitter python parsing fallback: {e}")
 
-                    elif isinstance(node, ast.Import):
-                        for alias in node.names:
-                            imports.append(alias.name)
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module:
-                            imports.append(node.module)
+            if not parsed_with_ts or not symbols:
+                # Python AST fallback
+                try:
+                    tree = ast.parse(content)
+                    for node in ast.walk(tree):
+                        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            start = node.lineno
+                            end = getattr(node, "end_lineno", start + len(node.body))
+                            snippet = "\n".join(lines[start - 1 : end])
+                            doc = ast.get_docstring(node)
+                            sig = f"def {node.name}(...)"
+                            if not any(s["name"] == node.name and s["start_line"] == start for s in symbols):
+                                symbols.append({"name": node.name, "kind": "function", "start_line": start, "end_line": end, "signature": sig, "docstring": doc})
+                                chunks.append({"start_line": start, "end_line": end, "content": snippet})
 
-            except Exception:
-                pass
+                        elif isinstance(node, ast.ClassDef):
+                            start = node.lineno
+                            end = getattr(node, "end_lineno", start + len(node.body))
+                            snippet = "\n".join(lines[start - 1 : end])
+                            doc = ast.get_docstring(node)
+                            if not any(s["name"] == node.name and s["start_line"] == start for s in symbols):
+                                symbols.append({"name": node.name, "kind": "class", "start_line": start, "end_line": end, "signature": f"class {node.name}", "docstring": doc})
+                                chunks.append({"start_line": start, "end_line": end, "content": snippet})
+
+                        elif isinstance(node, ast.Import):
+                            for alias in node.names:
+                                if alias.name not in imports:
+                                    imports.append(alias.name)
+                        elif isinstance(node, ast.ImportFrom):
+                            if node.module and node.module not in imports:
+                                imports.append(node.module)
+                except Exception:
+                    pass
 
         elif lang in ["typescript", "javascript"]:
-            # Fast regex parser for JS/TS
-            fn_matches = re.finditer(r"(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)", content)
-            for m in fn_matches:
-                line_no = content[:m.start()].count("\n") + 1
-                symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": min(line_no + 15, len(lines))})
+            parsed_with_ts = False
+            if js_parser is not None:
+                try:
+                    tree = js_parser.parse(content.encode("utf-8"))
+                    for node in tree.root_node.children:
+                        target = node
+                        if node.type == "export_statement":
+                            for child in node.children:
+                                if child.type in ("function_declaration", "class_declaration", "lexical_declaration"):
+                                    target = child
+                                    break
 
-            imp_matches = re.finditer(r"import\s+.*?\s+from\s+['\"](.*?)['\"]", content)
-            for m in imp_matches:
-                imports.append(m.group(1))
+                        if target.type == "function_declaration":
+                            n = target.child_by_field_name("name")
+                            if n:
+                                name_str = n.text.decode("utf-8")
+                                start = target.start_point.row + 1
+                                end = target.end_point.row + 1
+                                symbols.append({
+                                    "name": name_str,
+                                    "kind": "function",
+                                    "start_line": start,
+                                    "end_line": end,
+                                    "signature": f"function {name_str}(...)"
+                                })
+                                chunks.append({"start_line": start, "end_line": end, "content": "\n".join(lines[start - 1 : end])})
+
+                        elif target.type == "class_declaration":
+                            n = target.child_by_field_name("name")
+                            if n:
+                                name_str = n.text.decode("utf-8")
+                                start = target.start_point.row + 1
+                                end = target.end_point.row + 1
+                                symbols.append({
+                                    "name": name_str,
+                                    "kind": "class",
+                                    "start_line": start,
+                                    "end_line": end,
+                                    "signature": f"class {name_str}"
+                                })
+                                chunks.append({"start_line": start, "end_line": end, "content": "\n".join(lines[start - 1 : end])})
+                                body = target.child_by_field_name("body")
+                                if body:
+                                    for m in body.children:
+                                        if m.type == "method_definition":
+                                            mn = m.child_by_field_name("name")
+                                            if mn:
+                                                m_start = m.start_point.row + 1
+                                                m_end = m.end_point.row + 1
+                                                symbols.append({
+                                                    "name": f"{name_str}.{mn.text.decode('utf-8')}",
+                                                    "kind": "method",
+                                                    "start_line": m_start,
+                                                    "end_line": m_end,
+                                                    "signature": f"{name_str}.{mn.text.decode('utf-8')}()"
+                                                })
+
+                        elif target.type == "lexical_declaration":
+                            for decl in target.children:
+                                if decl.type == "variable_declarator":
+                                    val = decl.child_by_field_name("value")
+                                    if val and val.type in ("arrow_function", "function_expression"):
+                                        n = decl.child_by_field_name("name")
+                                        if n:
+                                            name_str = n.text.decode("utf-8")
+                                            start = target.start_point.row + 1
+                                            end = target.end_point.row + 1
+                                            symbols.append({
+                                                "name": name_str,
+                                                "kind": "function",
+                                                "start_line": start,
+                                                "end_line": end,
+                                                "signature": f"const {name_str} = () => ..."
+                                            })
+                                            chunks.append({"start_line": start, "end_line": end, "content": "\n".join(lines[start - 1 : end])})
+
+                        elif target.type == "import_statement":
+                            src = target.child_by_field_name("source")
+                            if src:
+                                imports.append(src.text.decode("utf-8").strip("'\""))
+
+                    parsed_with_ts = True
+                except Exception as e:
+                    logger.debug(f"Tree-sitter JS/TS parsing fallback: {e}")
+
+            if not parsed_with_ts or not symbols:
+                # Fast regex fallback for JS/TS
+                fn_matches = re.finditer(r"(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)", content)
+                for m in fn_matches:
+                    line_no = content[:m.start()].count("\n") + 1
+                    symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": min(line_no + 15, len(lines))})
+
+                imp_matches = re.finditer(r"import\s+.*?\s+from\s+['\"](.*?)['\"]", content)
+                for m in imp_matches:
+                    imports.append(m.group(1))
 
         # If no specific function chunks found or file is small, create full file / block chunks
         if not chunks:

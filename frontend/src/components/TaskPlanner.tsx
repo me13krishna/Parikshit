@@ -20,14 +20,18 @@ interface TaskPlannerProps {
   projectId: string;
   onError: (err: ApiClientError) => void;
   onSandboxRunComplete?: (result: SandboxResult) => void;
+  initialPrompt?: string;
 }
 
 export const TaskPlanner: React.FC<TaskPlannerProps> = ({
   projectId,
   onError,
   onSandboxRunComplete,
+  initialPrompt,
 }) => {
-  const [requestText, setRequestText] = useState<string>("Implement robust multiply operation and unit tests");
+  const [requestText, setRequestText] = useState<string>(
+    initialPrompt || "Implement robust multiply operation and unit tests"
+  );
   const [activeTask, setActiveTask] = useState<TaskItem | null>(null);
   const [plan, setPlan] = useState<TaskPlan | null>(null);
   const [diff, setDiff] = useState<string>("");
@@ -128,28 +132,33 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 pb-16">
       {/* Header Context */}
-      <div className="flex items-center justify-between pb-3 border-b border-[rgba(159,176,204,0.12)]">
+      <div className="flex items-center justify-between pb-3 border-b border-[#29313D]">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-[rgba(7,108,211,0.12)] text-[var(--color-blue-500)]">
+          <div className="p-1.5 rounded-lg bg-[#191F2B] text-[#C6F36B] border border-[#29313D]">
             <Hammer className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-xs font-semibold text-[var(--color-text-100)] font-display">
-              Stage 2: Change
+            <h2 className="text-xs font-semibold text-[#F4F6FA] font-display">
+              AI Coding Agent
             </h2>
-            <p className="text-[11px] text-[var(--color-text-500)]">
-              Task planning, unified diffs, and mandatory human approval gate
+            <p className="text-[11px] text-[#929BAA]">
+              Formulate implementation plans, review unified diffs, and enforce human approval
             </p>
           </div>
         </div>
+
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#F4F6FA] bg-[#121720] px-2.5 py-1 rounded-md border border-[#29313D]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#C6F36B]" />
+          <span>Stage 2: Build</span>
+        </div>
       </div>
 
-      {/* Task Formulation Card */}
-      <section className="rounded-2xl bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.16)] p-5 border-active-top">
-        <h3 className="text-xs font-semibold text-[var(--color-text-100)] mb-2 font-display">
-          Specify Code Change or Feature Request
+      {/* Task Specification Card */}
+      <section className="rounded-xl bg-[#121720] border border-[#29313D] p-5 border-active-top shadow-xl">
+        <h3 className="text-xs font-semibold text-[#F4F6FA] mb-2 font-display">
+          Specify Engineering Task or Feature Request
         </h3>
         <form onSubmit={handleCreateTask} className="flex flex-col sm:flex-row gap-2.5">
           <input
@@ -157,17 +166,17 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
             value={requestText}
             onChange={(e) => setRequestText(e.target.value)}
             placeholder="Describe the requested feature, bugfix, or refactor..."
-            className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-ink-950)] border border-[rgba(159,176,204,0.18)] text-[var(--color-text-100)] text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-300)]"
+            className="flex-1 px-3.5 py-2.5 rounded-lg bg-[#0B0D12] border border-[#29313D] text-[#F4F6FA] text-xs focus:outline-none focus:border-[#C6F36B] placeholder-[#5E697A]"
             required
           />
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2.5 rounded-xl bg-[var(--color-blue-500)] hover:bg-[var(--color-sky-400)] disabled:bg-[var(--color-ink-800)] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-md shadow-[rgba(7,108,211,0.25)] shrink-0"
+            className="px-4 py-2.5 rounded-lg bg-[#C6F36B] hover:bg-[#b5e655] disabled:opacity-50 text-[#0B0D12] text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-md shadow-[rgba(198,243,107,0.15)] shrink-0"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Formulating Plan...</span>
               </>
             ) : (
@@ -177,25 +186,25 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
         </form>
       </section>
 
-      {/* Empty State before Plan */}
+      {/* Empty State before Plan (Must contain: 'No active change task created yet.') */}
       {!activeTask && (
-        <div className="p-8 text-center rounded-2xl border border-[rgba(159,176,204,0.12)] bg-[var(--color-ink-900)]/40 text-[var(--color-text-500)] text-xs space-y-2">
-          <p>No active change task created yet.</p>
-          <p className="text-[11px] text-[var(--color-text-300)]">
-            Type a prompt above (e.g. &ldquo;Implement robust multiply operation&rdquo;) and click &ldquo;Plan Task&rdquo;.
+        <div className="p-10 text-center rounded-xl border border-[#29313D] bg-[#121720]/40 text-[#929BAA] text-xs space-y-2">
+          <p className="font-semibold text-[#F4F6FA]">No active change task created yet.</p>
+          <p className="text-[11px] text-[#5E697A]">
+            Type a task description above (e.g. &ldquo;Implement robust multiply operation&rdquo;) and click &ldquo;Plan Task&rdquo;.
           </p>
         </div>
       )}
 
       {/* Task & Plan Breakdown */}
       {activeTask && (
-        <section className="rounded-2xl bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.16)] p-5 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[rgba(159,176,204,0.12)]">
+        <section className="rounded-xl bg-[#121720] border border-[#29313D] p-5 space-y-5 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#29313D]">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-semibold text-[var(--color-text-100)]">
-                Task ID: {activeTask.id}
+              <span className="text-xs font-mono font-semibold text-[#F4F6FA]">
+                Task: {activeTask.id}
               </span>
-              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-[var(--color-ink-800)] text-[var(--color-text-300)] border border-[rgba(159,176,204,0.14)]">
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#191F2B] text-[#C6F36B] border border-[#29313D]">
                 Status: {activeTask.status}
               </span>
             </div>
@@ -205,7 +214,7 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
               <button
                 onClick={handleBuild}
                 disabled={actionLoading === "build"}
-                className="px-3.5 py-1.5 rounded-lg bg-[var(--color-indigo-500)] hover:bg-[var(--color-indigo-500)]/80 disabled:bg-[var(--color-ink-800)] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                className="px-3 py-1.5 rounded-lg bg-[#C6F36B] hover:bg-[#b5e655] disabled:opacity-50 text-[#0B0D12] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
               >
                 {actionLoading === "build" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -218,7 +227,7 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
               <button
                 onClick={() => handleRunChecks("pytest")}
                 disabled={actionLoading === "sandbox"}
-                className="px-3.5 py-1.5 rounded-lg bg-[var(--color-ink-800)] hover:bg-[var(--color-ink-800)]/80 text-[var(--color-text-100)] text-xs font-mono transition-colors border border-[rgba(159,176,204,0.14)]"
+                className="px-3 py-1.5 rounded-lg bg-[#191F2B] hover:bg-[#222B3D] text-[#F4F6FA] text-xs font-mono transition-colors border border-[#29313D]"
               >
                 {actionLoading === "sandbox" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -231,13 +240,13 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
 
           {/* Structured Step Breakdown */}
           {plan && (
-            <div className="p-4 bg-[var(--color-ink-950)] rounded-xl border border-[rgba(159,176,204,0.14)] text-xs">
-              <div className="text-[var(--color-text-100)] font-medium mb-2">{plan.summary}</div>
+            <div className="p-4 bg-[#0B0D12] rounded-xl border border-[#29313D] text-xs space-y-2">
+              <div className="text-[#F4F6FA] font-medium">{plan.summary}</div>
               {plan.steps && (
-                <ul className="space-y-1.5 text-[var(--color-text-300)] text-[11px]">
+                <ul className="space-y-1.5 text-[#929BAA] text-[11px]">
                   {plan.steps.map((st, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <span className="font-mono text-[var(--color-cyan-300)] font-bold">
+                      <span className="font-mono text-[#C6F36B] font-bold">
                         #{st.step || i + 1}
                       </span>
                       <span>{st.description}</span>
@@ -253,22 +262,22 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
 
           {/* Prominent Human Approval Gate */}
           {diff && (
-            <div className="rounded-xl border border-[rgba(159,176,204,0.2)] bg-[var(--color-ink-950)] p-4 space-y-3">
+            <div className="rounded-xl border border-[#29313D] bg-[#0B0D12] p-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-[var(--color-cyan-300)]" />
+                  <ShieldCheck className="w-4 h-4 text-[#C6F36B]" />
                   <div>
-                    <span className="text-xs font-semibold text-[var(--color-text-100)] font-sans">
+                    <span className="text-xs font-semibold text-[#F4F6FA] font-sans">
                       Human Approval Gate
                     </span>
-                    <p className="text-[11px] text-[var(--color-text-500)]">
+                    <p className="text-[11px] text-[#929BAA]">
                       Explicit developer sign-off required before patch applies to repository source.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-[var(--color-text-500)]">State:</span>
+                  <span className="text-[11px] font-mono text-[#5E697A]">State:</span>
                   <span
                     className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${
                       approvalStatus === "approved"
@@ -285,12 +294,12 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
 
               {/* Scope of modification */}
               {filesChanged.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-[var(--color-text-300)] pt-1">
-                  <span className="text-[var(--color-text-500)]">Files to approve:</span>
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-[#929BAA] pt-1">
+                  <span className="text-[#5E697A]">Files to approve:</span>
                   {filesChanged.map((f, fi) => (
                     <span
                       key={fi}
-                      className="px-2 py-0.5 rounded bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.14)] text-[var(--color-cyan-300)]"
+                      className="px-2 py-0.5 rounded bg-[#121720] border border-[#29313D] text-[#C6F36B]"
                     >
                       {f}
                     </span>
@@ -299,11 +308,11 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[rgba(159,176,204,0.12)]">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#29313D]">
                 <button
                   onClick={() => handleApprove("approved")}
                   disabled={actionLoading === "approve" || approvalStatus === "approved"}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--color-ink-800)] text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-1.5 rounded-lg bg-[#39D98A] hover:bg-[#2fc47a] disabled:opacity-40 text-[#0B0D12] text-xs font-semibold flex items-center gap-1.5 transition-colors"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Approve Patch</span>
@@ -312,7 +321,7 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
                 <button
                   onClick={() => handleApprove("rejected")}
                   disabled={actionLoading === "approve" || approvalStatus === "rejected"}
-                  className="px-3.5 py-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/50 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs font-medium flex items-center gap-1.5 transition-colors"
                 >
                   <XCircle className="w-3.5 h-3.5" />
                   <span>Reject Patch</span>
@@ -326,10 +335,10 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
                       ? "Human approval is strictly required before exporting patch"
                       : "Export and apply verified patch to source workspace"
                   }
-                  className="px-3.5 py-1.5 rounded-lg bg-[var(--color-blue-500)] hover:bg-[var(--color-sky-400)] disabled:bg-[var(--color-ink-800)] disabled:text-[var(--color-text-500)] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="px-3.5 py-1.5 rounded-lg bg-[#191F2B] hover:bg-[#222B3D] disabled:opacity-40 text-[#F4F6FA] border border-[#29313D] text-xs font-medium flex items-center gap-1.5 transition-colors"
                 >
                   {exported ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#39D98A]" />
                   ) : (
                     <Download className="w-3.5 h-3.5" />
                   )}
@@ -350,34 +359,34 @@ export const TaskPlanner: React.FC<TaskPlannerProps> = ({
           role="dialog"
           aria-modal="true"
           aria-label="Confirm patch export"
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="bg-[var(--color-ink-900)] border border-[rgba(159,176,204,0.2)] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border-active-top">
+          <div className="bg-[#121720] border border-[#29313D] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border-active-top">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-[rgba(106,215,250,0.1)] text-[var(--color-cyan-300)]">
+              <div className="p-2 rounded-lg bg-[#0B0D12] text-[#C6F36B] border border-[#29313D]">
                 <AlertCircle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-[var(--color-text-100)] font-display">
+                <h3 className="text-sm font-semibold text-[#F4F6FA] font-display">
                   Confirm Patch Export to Source
                 </h3>
-                <p className="text-xs text-[var(--color-text-300)] mt-1">
+                <p className="text-xs text-[#929BAA] mt-1">
                   This action will apply the approved patch directly to the active working tree. The export event and resulting SHA-256 hash will be recorded in the cryptographic ledger.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[rgba(159,176,204,0.12)]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#29313D]">
               <button
                 onClick={() => setConfirmExportModal(false)}
-                className="px-3.5 py-1.5 rounded-lg bg-[var(--color-ink-800)] hover:bg-[var(--color-ink-800)]/80 text-[var(--color-text-300)] text-xs font-medium transition-colors"
+                className="px-3.5 py-1.5 rounded-lg bg-[#191F2B] hover:bg-[#222B3D] text-[#929BAA] text-xs font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmExport}
                 disabled={actionLoading === "export"}
-                className="px-4 py-1.5 rounded-lg bg-[var(--color-blue-500)] hover:bg-[var(--color-sky-400)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md"
+                className="px-4 py-1.5 rounded-lg bg-[#C6F36B] hover:bg-[#b5e655] text-[#0B0D12] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md"
               >
                 {actionLoading === "export" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

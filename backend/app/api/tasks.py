@@ -44,6 +44,7 @@ def resolve_check_command(profile: Optional[str], command: Optional[str]) -> str
 
 class CreateTaskRequest(BaseModel):
     request_text: str
+    project_id: Optional[str] = None
 
 class ApprovalRequest(BaseModel):
     decision: str  # approved | rejected
@@ -52,6 +53,11 @@ class RunCommandRequest(BaseModel):
     profile: Optional[str] = None
     command: Optional[str] = None
     timeout_sec: Optional[int] = None
+
+@router.post("/tasks")
+async def create_task_direct(req: CreateTaskRequest):
+    result = await TaskService.create_task(req.project_id or "", req.request_text)
+    return success_response(result, status_code=201)
 
 @router.post("/projects/{project_id}/tasks")
 async def create_task(project_id: str, req: CreateTaskRequest):
@@ -105,8 +111,13 @@ async def run_checks(
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute("SELECT id FROM workspaces WHERE task_id = ? ORDER BY created_at DESC LIMIT 1;", (task_id,))
-        wsp = await cursor.fetchone()
+        wsp = None
+        if task_id and task_id != "default":
+            cursor = await db.execute("SELECT id FROM workspaces WHERE task_id = ? ORDER BY created_at DESC LIMIT 1;", (task_id,))
+            wsp = await cursor.fetchone()
+        if not wsp:
+            cursor = await db.execute("SELECT id FROM workspaces ORDER BY created_at DESC LIMIT 1;")
+            wsp = await cursor.fetchone()
         if not wsp:
             return error_response("No active workspace found for this task", code="NO_WORKSPACE", status_code=400)
 

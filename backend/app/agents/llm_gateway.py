@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import asyncio
+import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Type, TypeVar
@@ -26,10 +27,12 @@ class LLMGateway:
             return bool(settings.OPENAI_API_KEY or "localhost" in settings.OPENAI_BASE_URL)
         if provider == "anthropic":
             return bool(settings.ANTHROPIC_API_KEY)
+        if provider in ["huggingface", "hf"]:
+            return bool(settings.HUGGINGFACE_API_KEY or "localhost" in settings.HUGGINGFACE_BASE_URL)
         return False
     """
     LLM Gateway abstraction layer supporting Mock, OpenAI (or OpenAI-compatible, Ollama),
-    and Anthropic Messages API, with token budget tracking and structured output validation.
+    Anthropic Messages API, and Hugging Face Inference API / router, with token budget tracking.
     """
 
     @staticmethod
@@ -102,6 +105,20 @@ class LLMGateway:
             )
             return res
 
+        if provider in ["huggingface", "hf"]:
+            if not settings.HUGGINGFACE_API_KEY and "localhost" not in settings.HUGGINGFACE_BASE_URL:
+                raise AppError(
+                    "HUGGINGFACE_API_KEY is not configured",
+                    code="LLM_NOT_CONFIGURED",
+                    status_code=500
+                )
+            res = await cls._call_huggingface(messages, target_model, temperature, response_format)
+            res["mode"] = "live"
+            await cls._record_usage(
+                target_model, "huggingface", res.get("input_tokens", 0), res.get("output_tokens", 0), session_id
+            )
+            return res
+
         raise AppError(
             f"Unsupported LLM provider '{settings.LLM_PROVIDER}'",
             code="INVALID_LLM_PROVIDER",
@@ -169,6 +186,80 @@ class LLMGateway:
                 clean_retry = clean_retry[:-3]
             data_retry = json.loads(clean_retry.strip())
             return response_model.model_validate(data_retry)
+
+    @classmethod
+    async def embed_text(
+        cls,
+        texts: List[str],
+        model: Optional[str] = None
+    ) -> List[List[float]]:
+        """
+        Generates dense vector embeddings using configured provider (Hugging Face / OpenAI / fallback).
+        """
+        provider = settings.LLM_PROVIDER.lower()
+        if not texts:
+            return []
+
+        # 1. Hugging Face Feature Extraction / Embeddings
+        if provider in ["huggingface", "hf"] and (settings.HUGGINGFACE_API_KEY or "localhost" in settings.HUGGINGFACE_BASE_URL):
+            hf_model = model or "sentence-transformers/all-MiniLM-L6-v2"
+            headers = {
+                "Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        f"{settings.HUGGINGFACE_BASE_URL}/embeddings",
+                        headers=headers,
+                        json={"model": hf_model, "input": texts}
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if "data" in data and isinstance(data["data"], list):
+                            return [item["embedding"] for item in data["data"]]
+            except Exception as e:
+                logger.debug(f"HF embeddings endpoint fallback: {e}")
+
+        # 2. OpenAI Embeddings
+        if provider == "openai" and (settings.OPENAI_API_KEY or "localhost" in settings.OPENAI_BASE_URL):
+            target_model = model or "text-embedding-3-small"
+            headers = {
+                "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        f"{settings.OPENAI_BASE_URL}/embeddings",
+                        headers=headers,
+                        json={"model": target_model, "input": texts}
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        return [item["embedding"] for item in data.get("data", [])]
+            except Exception as e:
+                logger.debug(f"OpenAI embeddings endpoint fallback: {e}")
+
+        # 3. Deterministic Token-Hash Pseudo-Embedding Fallback (Offline / Mock Mode)
+        # Generates a normalized 64-dimensional float vector based on sha256 term hashing
+        results = []
+        dim = 64
+        for text in texts:
+            vec = [0.0] * dim
+            tokens = text.lower().split()
+            if not tokens:
+                results.append(vec)
+                continue
+            for tok in tokens:
+                idx = int(hashlib.md5(tok.encode("utf-8")).hexdigest(), 16) % dim
+                vec[idx] += 1.0
+            norm = (sum(x * x for x in vec)) ** 0.5
+            if norm > 0:
+                vec = [x / norm for x in vec]
+            results.append(vec)
+        return results
+
 
     @classmethod
     async def _call_openai(
@@ -282,6 +373,60 @@ class LLMGateway:
                 await asyncio.sleep(1)
 
         raise AppError("Anthropic call failed after retries", code="LLM_API_ERROR", status_code=502)
+
+    @classmethod
+    async def _call_huggingface(
+        cls,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        response_format: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        hf_model = model if ("/" in model) else "Qwen/Qwen2.5-Coder-7B-Instruct"
+        headers = {
+            "Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload: Dict[str, Any] = {
+            "model": hf_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 4096
+        }
+        if response_format:
+            payload["response_format"] = response_format
+
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=90.0) as client:
+                    resp = await client.post(
+                        f"{settings.HUGGINGFACE_BASE_URL}/chat/completions",
+                        headers=headers,
+                        json=payload
+                    )
+                    if resp.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                    resp.raise_for_status()
+                    data = resp.json()
+                    content = data["choices"][0]["message"]["content"]
+                    usage = data.get("usage", {})
+                    return {
+                        "content": content,
+                        "role": "assistant",
+                        "model": hf_model,
+                        "input_tokens": usage.get("prompt_tokens", 0),
+                        "output_tokens": usage.get("completion_tokens", 0)
+                    }
+            except httpx.HTTPStatusError as e:
+                if attempt == 2:
+                    raise AppError(f"Hugging Face API error: {e.response.text}", code="LLM_API_ERROR", status_code=502)
+            except Exception as exc:
+                if attempt == 2:
+                    raise AppError(f"Hugging Face connection error: {exc}", code="LLM_NETWORK_ERROR", status_code=502)
+                await asyncio.sleep(1)
+
+        raise AppError("Hugging Face call failed after retries", code="LLM_API_ERROR", status_code=502)
 
     @classmethod
     async def _record_usage(

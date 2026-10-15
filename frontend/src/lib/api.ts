@@ -146,7 +146,13 @@ export const api = {
   },
 
   async listProjects(): Promise<Array<{ id: string; name: string; source_type: string; default_revision_id: string }>> {
-    return request("/projects");
+    const res = await request<
+      | { projects: Array<{ id: string; name: string; source_type: string; default_revision_id: string }> }
+      | Array<{ id: string; name: string; source_type: string; default_revision_id: string }>
+    >("/projects");
+    if (Array.isArray(res)) return res;
+    if (res && "projects" in res && Array.isArray(res.projects)) return res.projects;
+    return [];
   },
 
   // Mentor & Understanding
@@ -250,7 +256,7 @@ export const api = {
   },
 
   // Digital Twin
-  async getTwinGraph(revisionId: string): Promise<{ nodes: TwinNode[]; edges: Array<{ from: string; to: string }> }> {
+  async getTwinGraph(revisionId: string): Promise<{ nodes: TwinNode[]; edges: TwinEdge[] }> {
     return request(`/twin/graph?revision_id=${encodeURIComponent(revisionId)}`);
   },
 

@@ -22,11 +22,18 @@ class DigitalTwinService:
         db_path = get_db_path()
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
-                (project_id,)
-            )
-            rev = await cursor.fetchone()
+            rev = None
+            if project_id and project_id != "default":
+                cursor = await db.execute(
+                    "SELECT id FROM repo_revisions WHERE project_id = ? ORDER BY indexed_at DESC LIMIT 1;",
+                    (project_id,)
+                )
+                rev = await cursor.fetchone()
+            if not rev:
+                cursor = await db.execute(
+                    "SELECT id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;"
+                )
+                rev = await cursor.fetchone()
             if not rev:
                 raise AppError("No revision found for project", code="NOT_FOUND")
 
