@@ -72,7 +72,12 @@ export const TwinLedgerSideBySide: React.FC<TwinLedgerSideBySideProps> = ({
           setSelectedFile(res.nodes[0].path || res.nodes[0].label || res.nodes[0].id);
         }
       } catch (err: unknown) {
-        if (!ignore && err instanceof ApiClientError) onError(err);
+        if (!ignore && err instanceof ApiClientError && (err.statusCode === 404 || err.code === "NOT_FOUND")) {
+          setTwinNodes([]);
+          setTwinEdges([]);
+        } else if (!ignore && err instanceof ApiClientError) {
+          onError(err);
+        }
       } finally {
         if (!ignore) setLoadingTwin(false);
       }

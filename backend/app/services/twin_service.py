@@ -35,7 +35,14 @@ class DigitalTwinService:
                 )
                 rev = await cursor.fetchone()
             if not rev:
-                raise AppError("No revision found for project", code="NOT_FOUND")
+                return {
+                    "project_id": project_id or "default",
+                    "revision_id": "",
+                    "nodes": [],
+                    "edges": [],
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                }
 
             revision_id = rev["id"]
 

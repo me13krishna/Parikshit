@@ -12,11 +12,15 @@ interface BannerProps {
 
 export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError }) => {
   const [copiedCid, setCopiedCid] = useState(false);
-  const isMock = health?.llm_provider === "mock" || health?.llm_mode === "mock";
+  const [dismissMock, setDismissMock] = useState(false);
+  const [dismissUnsandboxed, setDismissUnsandboxed] = useState(false);
+
+  const isMock = (health?.llm_provider === "mock" || health?.llm_mode === "mock") && !dismissMock;
   const isUnsandboxed =
-    health?.sandbox_mode === "host" ||
-    health?.sandbox?.includes("local fallback") ||
-    health?.sandbox?.includes("disabled");
+    (health?.sandbox_mode === "host" ||
+      health?.sandbox?.includes("local fallback") ||
+      health?.sandbox?.includes("disabled")) &&
+    !dismissUnsandboxed;
 
   const handleCopyCid = (cid: string) => {
     navigator.clipboard.writeText(cid);
@@ -25,35 +29,48 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
   };
 
   return (
-    <aside aria-label="System announcements" className="flex flex-col gap-1 w-full z-30 select-none">
-      {/* Mock Mode Banner */}
+    <aside aria-label="System announcements" className="flex flex-col w-full z-30 select-none">
+      {/* Mock Mode Slim Strip */}
       {isMock && (
-        <div className="bg-[#121720] border-b border-[#29313D] text-amber-200 px-4 py-2 flex items-center justify-between text-xs font-mono shadow-sm">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-[#C6F36B] shrink-0" />
-            <span className="font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-[10px]">
+        <div className="bg-[var(--surface-1)] border-b border-[var(--border-subtle)] text-[var(--text-secondary)] px-4 py-1.5 flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#5E6AD2] shrink-0" />
+            <span className="font-semibold tracking-wide uppercase px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px]">
               DEMO / MOCK MODE
             </span>
-            <span className="text-[#929BAA] hidden sm:inline">
+            <span className="text-[var(--text-secondary)] text-[11px] hidden sm:inline">
               LLM responses and code generations are running in deterministic mock mode. Zero external API costs.
             </span>
           </div>
-          <span className="text-[#5E697A] text-[10px]">provider: mock</span>
+          <button
+            onClick={() => setDismissMock(true)}
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded"
+            title="Dismiss notification"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
-      {/* Unsandboxed Host Warning */}
+      {/* Unsandboxed Host Warning Slim Strip */}
       {isUnsandboxed && (
-        <div className="bg-rose-950/60 border-b border-rose-600/40 text-rose-200 px-4 py-1.5 flex items-center justify-between text-xs font-mono backdrop-blur-sm">
+        <div className="bg-rose-950/30 border-b border-rose-900/40 text-rose-200 px-4 py-1.5 flex items-center justify-between text-xs font-mono">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-            <span className="font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-rose-500/20 border border-rose-500/30 text-[10px]">
+            <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            <span className="font-semibold tracking-wider uppercase px-1.5 py-0.2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[10px]">
               UNSANDBOXED HOST
             </span>
             <span className="text-rose-300/80 text-[11px] hidden sm:inline">
               Docker sandbox disabled. Test profiles run directly on the host in development fallback mode.
             </span>
           </div>
+          <button
+            onClick={() => setDismissUnsandboxed(true)}
+            className="text-rose-400/80 hover:text-rose-200 p-0.5 rounded"
+            title="Dismiss notification"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
@@ -62,40 +79,40 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
         <div
           role="alert"
           aria-live="assertive"
-          className="mx-3 sm:mx-6 mt-2 p-3.5 bg-rose-950/90 border border-rose-700/60 rounded-xl shadow-2xl text-rose-200 flex items-start justify-between gap-3 animate-in fade-in duration-200"
+          className="mx-3 sm:mx-6 my-2 p-3 bg-[var(--surface-1)] border border-rose-800/40 rounded-xl shadow-xl text-rose-200 flex items-start justify-between gap-3 animate-in fade-in duration-200"
         >
           <div className="flex items-start gap-3 min-w-0">
-            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-            <div className="flex flex-col gap-1 text-xs">
-              <div className="font-semibold text-rose-100 font-sans leading-snug">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-0.5 text-xs">
+              <div className="font-medium text-[var(--text-primary)] font-sans leading-snug">
                 {error.message}
               </div>
 
               {/* Troubleshooting advice */}
-              <div className="text-[11px] text-rose-300/90 font-sans">
+              <div className="text-[11px] text-[var(--text-secondary)] font-sans">
                 {error.fixAdvice ||
                   "Check network connectivity to localhost:8000 or re-ingest the demo project."}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 font-mono text-[11px] text-rose-400/90 mt-1">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[var(--text-muted)] mt-1">
                 {error.code && (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-900/60 border border-rose-800">
-                    Code: <strong className="text-rose-200 font-bold">{error.code}</strong>
+                  <span className="px-1.5 py-0.2 rounded bg-[var(--surface-2)] border border-[var(--border-subtle)] text-rose-300">
+                    Code: <strong className="font-semibold">{error.code}</strong>
                   </span>
                 )}
                 {error.correlationId && (
-                  <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-rose-900/60 border border-rose-800">
+                  <div className="flex items-center gap-1.5 px-1.5 py-0.2 rounded bg-[var(--surface-2)] border border-[var(--border-subtle)]">
                     <span>
-                      CID: <strong className="text-rose-200 font-bold">{error.correlationId}</strong>
+                      CID: <strong className="text-[var(--text-secondary)] font-semibold">{error.correlationId}</strong>
                     </span>
                     <button
                       onClick={() => handleCopyCid(error.correlationId!)}
                       aria-label="Copy correlation ID"
-                      className="text-rose-300 hover:text-white transition-colors"
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                       title="Copy correlation ID for tracing"
                     >
                       {copiedCid ? (
-                        <Check className="w-3 h-3 text-[#39D98A]" />
+                        <Check className="w-3 h-3 text-[#34D399]" />
                       ) : (
                         <Copy className="w-3 h-3" />
                       )}
@@ -110,9 +127,9 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
             <button
               onClick={onDismissError}
               aria-label="Dismiss error"
-              className="text-rose-400 hover:text-rose-100 p-1 rounded-lg hover:bg-rose-900/60 transition-colors shrink-0"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-md hover:bg-[var(--surface-2)] transition-colors shrink-0"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

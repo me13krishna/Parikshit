@@ -157,13 +157,6 @@ export default function ParikshitCockpit() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col font-sans selection:bg-[#C6F36B]/20 selection:text-[#C6F36B]">
-      {/* System Banner (Mock Warning, Unsandboxed Notice, Error Toast) */}
-      <Banner
-        health={health}
-        error={activeError}
-        onDismissError={() => setActiveError(null)}
-      />
-
       {/* Cockpit Top Bar */}
       <Header
         health={health}
@@ -180,6 +173,13 @@ export default function ParikshitCockpit() {
         onRefreshHealth={loadSystemTelemetry}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onOpenSettings={() => setSettingsModalOpen(true)}
+      />
+
+      {/* System Banner (Mock Warning, Unsandboxed Notice, Error Toast) */}
+      <Banner
+        health={health}
+        error={activeError}
+        onDismissError={() => setActiveError(null)}
       />
 
       {/* Main Cockpit Body */}

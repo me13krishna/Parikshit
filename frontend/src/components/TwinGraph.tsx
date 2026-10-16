@@ -45,7 +45,12 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
           setSelectedFile(res.nodes[0].path || res.nodes[0].label || res.nodes[0].id);
         }
       } catch (err: unknown) {
-        if (err instanceof ApiClientError && onErrorRef.current) onErrorRef.current(err);
+        if (err instanceof ApiClientError && (err.statusCode === 404 || err.code === "NOT_FOUND")) {
+          setNodes([]);
+          setEdges([]);
+        } else if (err instanceof ApiClientError && onErrorRef.current) {
+          onErrorRef.current(err);
+        }
       } finally {
         setLoading(false);
       }

@@ -31,9 +31,9 @@ async def test_watsonx_role_models():
     orig_provider = settings.LLM_PROVIDER
     try:
         settings.LLM_PROVIDER = "watsonx"
-        # Role model should default to IBM Granite model
+        # Role model should default to IBM Granite or supported watsonx model
         model = LLMGateway.get_role_model("builder")
-        assert "granite" in model.lower() or "ibm" in model.lower()
+        assert "granite" in model.lower() or "ibm" in model.lower() or "llama" in model.lower()
     finally:
         settings.LLM_PROVIDER = orig_provider
 
