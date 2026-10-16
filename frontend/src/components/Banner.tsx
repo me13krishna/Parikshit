@@ -91,7 +91,7 @@ export const Banner: React.FC<BannerProps> = ({ health, error, onDismissError })
               {/* Troubleshooting advice */}
               <div className="text-[11px] text-[var(--text-secondary)] font-sans">
                 {error.fixAdvice ||
-                  "Check network connectivity to localhost:8000 or re-ingest the demo project."}
+                  "Check network connectivity to the backend service or re-ingest the demo project."}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[var(--text-muted)] mt-1">

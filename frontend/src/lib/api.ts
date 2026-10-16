@@ -16,10 +16,24 @@ import {
   ApiError
 } from "./types";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:8000/api/v1";
+function getApiBase(): string {
+  let base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+      ? "https://parikshit-backend.onrender.com/api/v1"
+      : process.env.NODE_ENV === "production"
+        ? "https://parikshit-backend.onrender.com/api/v1"
+        : "http://localhost:8000/api/v1");
+
+  base = base.trim().replace(/\/+$/, "");
+  if (!base.endsWith("/api/v1") && !base.endsWith("/api")) {
+    base = `${base}/api/v1`;
+  }
+  return base;
+}
+
+const API_BASE = getApiBase();
 
 export class ApiClientError extends Error {
   code: string;
