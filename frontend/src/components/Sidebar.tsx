@@ -132,7 +132,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
-  projectName = "Demo Calculator Service",
+  projectName = "No Active Project",
   revisionId,
   onOpenSettings,
   onSwitchRepo,

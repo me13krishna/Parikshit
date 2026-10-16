@@ -81,12 +81,16 @@ class DigitalTwinService:
             from_file = evidence.get("from")
             imported_mod = evidence.get("imported")
 
-            # Try to resolve target file in project
+            # Try to resolve target file in project (polyglot: Python, JS/TS, etc.)
             target_node = None
-            for p, nid in file_path_to_node.items():
-                if imported_mod and (imported_mod in p or p.startswith(imported_mod)):
-                    target_node = nid
-                    break
+            if imported_mod:
+                clean_mod = imported_mod.strip().strip("'\"").replace(".", "/").lstrip("./")
+                mod_stem = Path(clean_mod).stem
+                for p, nid in file_path_to_node.items():
+                    p_stem = Path(p).stem
+                    if mod_stem == p_stem or clean_mod in p or p.endswith(f"{clean_mod}.py") or p.endswith(f"{clean_mod}.ts") or p.endswith(f"{clean_mod}.js"):
+                        target_node = nid
+                        break
 
             from_node = file_path_to_node.get(from_file)
             if from_node and target_node and from_node != target_node:

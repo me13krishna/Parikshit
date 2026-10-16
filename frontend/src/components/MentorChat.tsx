@@ -133,82 +133,39 @@ export const MentorChat: React.FC<MentorChatProps> = ({
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: unknown) {
-      if (err instanceof ApiClientError && err.code === "NETWORK_ERROR") {
-        // High-fidelity grounded fallback for cloud preview / offline deployments
-        const lower = textToSend.toLowerCase();
-        let content = "In this repository, operations are handled by `calculator_app/calculator.py` with strict invariant assertions in `calculator_app/test_calculator.py`. Every calculation step enforces non-zero denominators before evaluation.";
-        const citations: Citation[] = [
-          {
-            path: "calculator_app/calculator.py",
-            start_line: 19,
-            end_line: 25,
-            commit_sha: revisionId || "rev_16818cb902c5",
-            snippet: "def divide(a: float, b: float) -> float:\n    \"\"\"Divide a by b with strict invariant checking.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b",
-            snippet_hash: "sha256:49c5e3f191b9a2b8e3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6",
-            verified: true,
-          },
-          {
-            path: "calculator_app/test_calculator.py",
-            start_line: 17,
-            end_line: 20,
-            commit_sha: revisionId || "rev_16818cb902c5",
-            snippet: "def test_divide_by_zero():\n    with pytest.raises(ValueError, match=\"Cannot divide by zero\"):\n        divide(10, 0)",
-            snippet_hash: "sha256:7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c",
-            verified: true,
-          },
-        ];
-
-        if (lower.includes("tour") || lower.includes("flow") || lower.includes("sign up") || lower.includes("journey")) {
-          content = "Here is the verified execution flow:\n\n1. **Input Reception**: Client request parsed in `calculator_app/calculator.py` (line 3).\n2. **Invariant Validation**: Enforces zero-division check before computation (lines 19-21).\n3. **Test Assertion**: Verified by automated test suites in `calculator_app/test_calculator.py` (lines 17-20).";
-        } else if (lower.includes("starter") || lower.includes("contribut") || lower.includes("task") || lower.includes("issue")) {
-          content = "For new contributors, here are the recommended starter tasks:\n\n1. **Add Remainder Operator (`%`)**: Implement modulo operator in `calculator_app/calculator.py`.\n2. **Add Modulo Tests**: Write corresponding unit tests in `calculator_app/test_calculator.py`.\n3. **Verify Edge Cases**: Assert negative and zero divisor behavior.";
-        } else if (lower.includes("architecture") || lower.includes("overview") || lower.includes("how") || lower.includes("connect")) {
-          content = "The architecture consists of three core components:\n\n- **CalculatorService** (`calculator.py`): Encapsulates all arithmetic logic.\n- **TestRunnerSuite** (`test_calculator.py`): Validates invariant contracts.\n- **QueueService** (`queue_service.py`): Dispatches async batch calculation jobs.";
-        }
-
-        const fallbackMsg: ChatMessage = {
-          id: nextMsgId("asst"),
-          role: "assistant",
-          content,
-          grounded: true,
-          citations,
-          uncertainty_notes: "Grounded with AST syntax mapping and cryptographic hash evidence.",
-          timestamp: "Just now",
-        };
-        setMessages((prev) => [...prev, fallbackMsg]);
-      } else if (err instanceof ApiClientError) {
+      if (err instanceof ApiClientError) {
         onError(err);
-      } else {
-        const fallbackMsg: ChatMessage = {
+        const errMsg: ChatMessage = {
           id: nextMsgId("err"),
           role: "assistant",
-          content:
-            "Encountered an issue processing query against AST syntax index. Try selecting an indexed file from the explorer on the left or asking about high-level architecture.",
+          content: `Unable to query Codebase Mentor: ${err.message}. Please verify that the repository has been ingested and indexed.`,
           grounded: false,
           citations: [],
           timestamp: "Just now",
         };
-        setMessages((prev) => [...prev, fallbackMsg]);
+        setMessages((prev) => [...prev, errMsg]);
+      } else {
+        const errMsg: ChatMessage = {
+          id: nextMsgId("err"),
+          role: "assistant",
+          content: "An unexpected error occurred while processing the query against the repository index.",
+          grounded: false,
+          citations: [],
+          timestamp: "Just now",
+        };
+        setMessages((prev) => [...prev, errMsg]);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const displayFiles =
-    repoFiles.length > 0
-      ? repoFiles
-      : [
-          { name: "calculator.py", lines: 110, role: "Core operations" },
-          { name: "test_calculator.py", lines: 60, role: "Pytest unit tests" },
-          { name: "README.md", lines: 32, role: "Documentation" },
-        ];
+  const displayFiles = repoFiles;
 
   const quickPrompts = [
-    "What are the core classes and calculation methods?",
-    "Where is error handling or division by zero implemented?",
-    "How are unit tests structured in this repository?",
-    "Suggest beginner-friendly starter issues",
+    "What are the core classes and entry points?",
+    "Where is error handling or invariant validation implemented?",
+    "How are tests structured in this repository?",
   ];
 
   return (
@@ -452,19 +409,8 @@ export const MentorChat: React.FC<MentorChatProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div className="space-y-2">
-                    <div className="p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] space-y-1">
-                      <div className="font-semibold text-[var(--text-primary)] text-xs">CalculatorService</div>
-                      <p className="text-[11px] text-[var(--text-secondary)]">
-                        Executes arithmetic calculations and enforces division invariants.
-                      </p>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] space-y-1">
-                      <div className="font-semibold text-[var(--text-primary)] text-xs">TestRunnerSuite</div>
-                      <p className="text-[11px] text-[var(--text-secondary)]">
-                        Validates edge cases, input typing, and exception handling.
-                      </p>
-                    </div>
+                  <div className="p-3 rounded-lg bg-[var(--surface-2)]/40 border border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)]">
+                    Components will be automatically synthesized from repository AST once indexed.
                   </div>
                 )}
               </div>

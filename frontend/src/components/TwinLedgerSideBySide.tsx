@@ -66,33 +66,20 @@ export const TwinLedgerSideBySide: React.FC<TwinLedgerSideBySideProps> = ({
       try {
         const res = await api.getTwinGraph(revisionId || "default");
         if (ignore) return;
-        const nodes = res.nodes && res.nodes.length > 0 ? res.nodes : [
-          { id: "calculator.py", label: "calculator.py", kind: "module", importance: 0.95, path: "calculator_app/calculator.py" },
-          { id: "test_calculator.py", label: "test_calculator.py", kind: "test", importance: 0.85, path: "calculator_app/test_calculator.py" },
-          { id: "queue_service.py", label: "queue_service.py", kind: "module", importance: 0.75, path: "calculator_app/queue_service.py" },
-        ];
-        const edges = res.edges && res.edges.length > 0 ? res.edges : [
-          { source: "test_calculator.py", target: "calculator.py", type: "imports" },
-          { source: "queue_service.py", target: "calculator.py", type: "imports" },
-        ];
+        const nodes = res.nodes || [];
+        const edges = res.edges || [];
         setTwinNodes(nodes);
         setTwinEdges(edges);
         if (nodes.length > 0) {
           setSelectedFile(nodes[0].path || nodes[0].label || nodes[0].id);
+        } else {
+          setSelectedFile("");
         }
       } catch {
         if (!ignore) {
-          const fallbackNodes = [
-            { id: "calculator.py", label: "calculator.py", kind: "module", importance: 0.95, path: "calculator_app/calculator.py" },
-            { id: "test_calculator.py", label: "test_calculator.py", kind: "test", importance: 0.85, path: "calculator_app/test_calculator.py" },
-            { id: "queue_service.py", label: "queue_service.py", kind: "module", importance: 0.75, path: "calculator_app/queue_service.py" },
-          ];
-          setTwinNodes(fallbackNodes);
-          setTwinEdges([
-            { source: "test_calculator.py", target: "calculator.py", type: "imports" },
-            { source: "queue_service.py", target: "calculator.py", type: "imports" },
-          ]);
-          setSelectedFile(fallbackNodes[0].path);
+          setTwinNodes([]);
+          setTwinEdges([]);
+          setSelectedFile("");
         }
       } finally {
         if (!ignore) setLoadingTwin(false);
@@ -124,7 +111,7 @@ export const TwinLedgerSideBySide: React.FC<TwinLedgerSideBySideProps> = ({
             prev_hash: "0000000000000000000000000000000000000000000000000000000000000000",
             content_hash: "a4f8b9c2d1e0f3a5b7c9d1e3f5a7b9c1d3e5f7a9b1c3d5e7f9a1b3c5d7e9f1a3",
             created_at: new Date(Date.now() - 3600000).toISOString(),
-            payload: { repository: "calculator_service", commit_sha: "rev_16818cb902c5" },
+            payload: { repository: projectId || "active_repository", status: "verified" },
           },
           {
             id: "led_ast_indexed",
@@ -295,7 +282,7 @@ export const TwinLedgerSideBySide: React.FC<TwinLedgerSideBySideProps> = ({
               <div className="flex items-center gap-2 min-w-0">
                 <FileCode className="w-3.5 h-3.5 text-[#5E6AD2] shrink-0" />
                 <span className="text-xs font-mono text-[var(--text-primary)] truncate">
-                  {selectedFile || "calculator.py"}
+                  {selectedFile || (twinNodes.length > 0 ? "Select a file to inspect" : "No files available")}
                 </span>
               </div>
 

@@ -97,8 +97,9 @@ class BattleService:
                 import_lines.append(f"import {stem}")
         if len(import_lines) == 1:
             py_candidates = [
-                p.stem for p in workspace_dir.glob("*.py")
+                p.stem for p in workspace_dir.rglob("*.py")
                 if not p.name.startswith("test_") and not p.name.startswith("conftest") and p.name != "__init__.py"
+                and not any(part in p.parts for part in [".git", "node_modules", ".venv", "__pycache__", ".pytest_cache"])
             ]
             for pc in py_candidates[:2]:
                 import_lines.append(f"import {pc}")

@@ -23,7 +23,7 @@ export default function ParikshitCockpit() {
   const [activeTab, setActiveTab] = useState<NavTab>("overview");
   const [health, setHealth] = useState<HealthData | null>(null);
   const [projectId, setProjectId] = useState<string>("");
-  const [projectName, setProjectName] = useState<string>("Demo Calculator Service");
+  const [projectName, setProjectName] = useState<string>("No Active Project");
   const [revisionId, setRevisionId] = useState<string>("");
   const [taskId, setTaskId] = useState<string>("");
   const [lastRunId, setLastRunId] = useState<string>("");
@@ -111,23 +111,20 @@ export default function ParikshitCockpit() {
           });
         }
 
-        const defaultProject = {
-          id: "prj_fc330a6c5375",
-          name: "Demo Calculator Service",
-          source_type: "local",
-          default_revision_id: "rev_16818cb902c5",
-        };
-
-        const effectiveProjects = (projects && projects.length > 0) ? projects : [defaultProject];
-        const latestProj = effectiveProjects[0];
-        setProjectId(latestProj.id);
-        setProjectName(latestProj.name);
-        setRevisionId(latestProj.default_revision_id);
+        if (projects && projects.length > 0) {
+          const latestProj = projects[0];
+          setProjectId(latestProj.id);
+          setProjectName(latestProj.name);
+          setRevisionId(latestProj.default_revision_id);
+        } else {
+          setProjectId("");
+          setProjectName("No Active Project");
+          setRevisionId("");
+        }
       } catch {
-        // Fallback gracefully
-        setProjectId("prj_fc330a6c5375");
-        setProjectName("Demo Calculator Service");
-        setRevisionId("rev_16818cb902c5");
+        setProjectId("");
+        setProjectName("No Active Project");
+        setRevisionId("");
       }
     };
     initWorkspace();

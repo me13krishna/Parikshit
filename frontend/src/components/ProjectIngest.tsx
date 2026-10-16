@@ -44,16 +44,16 @@ export const ProjectIngest: React.FC<ProjectIngestProps> = ({
   onError,
   onNavigateStage,
   onGlobalAiQuery,
-  projectName = "Demo Calculator Service",
+  projectName = "No Active Project",
   revisionId,
   projectId,
   health,
   ledgerStatus,
 }) => {
   const [globalAiInput, setGlobalAiInput] = useState<string>("");
-  const [sourceType, setSourceType] = useState<"git" | "local" | "zip">("local");
-  const [sourceUri, setSourceUri] = useState<string>("./data/demo/calculator_app");
-  const [inputProjectName, setInputProjectName] = useState<string>("Demo Calculator Service");
+  const [sourceType, setSourceType] = useState<"git" | "local" | "zip">("git");
+  const [sourceUri, setSourceUri] = useState<string>("");
+  const [inputProjectName, setInputProjectName] = useState<string>("");
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
@@ -286,7 +286,7 @@ export const ProjectIngest: React.FC<ProjectIngestProps> = ({
 
             <div className="flex flex-wrap gap-1.5 pt-1">
               <span className="px-2 py-0.5 rounded bg-[var(--surface-2)] text-[10px] font-mono text-[var(--text-muted)]">
-                calculator.py:42-58
+                AST Syntax Citations
               </span>
               <span className="px-2 py-0.5 rounded bg-[var(--surface-2)] text-[10px] font-mono text-[var(--text-muted)]">
                 Architecture Tour
@@ -420,7 +420,7 @@ export const ProjectIngest: React.FC<ProjectIngestProps> = ({
                 type="button"
                 onClick={() => {
                   setSourceType("local");
-                  setSourceUri("./data/demo/calculator_app");
+                  setSourceUri("");
                 }}
                 className={`p-2.5 rounded-lg border text-left text-xs transition-all ${
                   sourceType === "local"

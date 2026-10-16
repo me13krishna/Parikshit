@@ -261,22 +261,65 @@ async def get_starter_tasks(project_id: str):
         )
         rows = [dict(r) for r in await cursor.fetchall()]
         if not rows:
-            rows = [
-                {
-                    "id": f"stk_{project_id[:8]}_1",
-                    "title": "Explore codebase entrypoints and data model",
-                    "rationale": "High-impact onboarding starting point",
-                    "risk_level": "low",
-                    "status": "open"
-                },
-                {
-                    "id": f"stk_{project_id[:8]}_2",
-                    "title": "Run test suite and verify test coverage",
-                    "rationale": "Verify baseline reliability in sandbox",
-                    "risk_level": "low",
-                    "status": "open"
-                }
-            ]
+            cursor_files = await db.execute(
+                """
+                SELECT f.path, f.kind, f.importance_score
+                FROM files f JOIN repo_revisions r ON f.revision_id = r.id
+                WHERE r.project_id = ?
+                ORDER BY f.importance_score DESC LIMIT 6;
+                """,
+                (project_id,)
+            )
+            files = [dict(r) for r in await cursor_files.fetchall()]
+            if files:
+                source_files = [f for f in files if f.get("kind") != "test"]
+                test_files = [f for f in files if f.get("kind") == "test"]
+                rows = []
+                if source_files:
+                    primary = source_files[0]["path"]
+                    rows.append({
+                        "id": f"stk_{project_id[:8]}_1",
+                        "title": f"Explore entry point & architecture in {Path(primary).name}",
+                        "rationale": f"Primary module located at {primary} (priority: {source_files[0]['importance_score']})",
+                        "risk_level": "low",
+                        "status": "open"
+                    })
+                if len(source_files) > 1:
+                    secondary = source_files[1]["path"]
+                    rows.append({
+                        "id": f"stk_{project_id[:8]}_2",
+                        "title": f"Add boundary checks and tests for {Path(secondary).name}",
+                        "rationale": f"Strengthen invariant validation in {secondary}",
+                        "risk_level": "medium",
+                        "status": "open"
+                    })
+                if test_files:
+                    t_path = test_files[0]["path"]
+                    rows.append({
+                        "id": f"stk_{project_id[:8]}_3",
+                        "title": f"Execute & expand test coverage in {Path(t_path).name}",
+                        "rationale": f"Automated test suite verification at {t_path}",
+                        "risk_level": "low",
+                        "status": "open"
+                    })
+                elif source_files:
+                    rows.append({
+                        "id": f"stk_{project_id[:8]}_3",
+                        "title": f"Implement automated unit tests for {Path(source_files[0]['path']).name}",
+                        "rationale": "Ensure test suite covers all public functions and interfaces",
+                        "risk_level": "low",
+                        "status": "open"
+                    })
+            if not rows:
+                rows = [
+                    {
+                        "id": f"stk_{project_id[:8]}_1",
+                        "title": "Explore codebase entry points and data model",
+                        "rationale": "High-impact onboarding starting point",
+                        "risk_level": "low",
+                        "status": "open"
+                    }
+                ]
         return success_response({"starter_tasks": rows})
 
 @router.get("/{project_id}/symbols")

@@ -30,7 +30,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   health,
-  projectName = "Demo Calculator Service",
+  projectName = "No Active Project",
   revisionId,
   ledgerStatus,
   activeStage = "overview",

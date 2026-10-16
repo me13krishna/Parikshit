@@ -711,124 +711,45 @@ class LLMGateway:
         model: str,
         role: Optional[str] = None
     ) -> Dict[str, Any]:
-        all_text = " ".join(m.get("content", "") for m in messages).lower()
+        raw_text = "\n".join(m.get("content", "") for m in messages)
+        all_text = raw_text.lower()
         last_user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-        lower_msg = last_user_msg.lower()
 
-        if role == "builder" or "builder" in all_text or "file to update:" in all_text:
-            if "test_calculator.py" in all_text:
-                mock_content = """```python
-import pytest
-from calculator import Calculator
+        # 1. Architecture Overview synthesis
+        if "architecture overview" in all_text or ("files:" in all_text and "symbols:" in all_text):
+            mock_content = cls._generate_dynamic_architecture_mock(raw_text)
 
-def test_add():
-    c = Calculator()
-    assert c.add(1, 2) == 3
+        # 2. Mentor Chat QA synthesis
+        elif "developer question:" in all_text or "code context:" in all_text or ("citations" in all_text and "answer_markdown" in all_text):
+            mock_content = cls._generate_dynamic_mentor_chat_mock(raw_text, last_user_msg)
 
-def test_subtract():
-    c = Calculator()
-    assert c.subtract(5, 2) == 3
+        # 3. Builder Agent
+        elif role == "builder" or "file to update:" in all_text:
+            mock_content = cls._generate_dynamic_builder_mock(raw_text)
 
-def test_multiply():
-    c = Calculator()
-    assert c.multiply(3, 4) == 12
+        # 4. Task Plan Generation
+        elif "files_affected" in all_text or "engineering implementation plan" in all_text:
+            mock_content = cls._generate_dynamic_plan_mock(raw_text)
 
-def test_divide():
-    c = Calculator()
-    assert c.divide(10, 2) == 5
-
-def test_divide_zero():
-    c = Calculator()
-    with pytest.raises(ValueError):
-        c.divide(10, 0)
-```"""
-            elif "calculator.py" in all_text:
-                mock_content = """```python
-class Calculator:
-    def __init__(self):
-        self.history = []
-
-    def add(self, a: float, b: float) -> float:
-        res = a + b
-        self.history.append(('add', a, b, res))
-        return res
-
-    def subtract(self, a: float, b: float) -> float:
-        res = a - b
-        self.history.append(('sub', a, b, res))
-        return res
-
-    def multiply(self, a: float, b: float) -> float:
-        res = a * b
-        self.history.append(('mul', a, b, res))
-        return res
-
-    def divide(self, a: float, b: float) -> float:
-        if b == 0:
-            raise ValueError("Cannot divide by zero")
-        res = a / b
-        self.history.append(('div', a, b, res))
-        return res
-```"""
-            elif "files_to_update" in all_text:
-                mock_content = json.dumps({
-                    "summary": "Implement requested feature and tests",
-                    "files_touched": ["main.py"],
-                    "files_to_update": {}
-                })
-            else:
-                mock_content = "```python\n# Automated update applied by Parikshit Builder\n```"
-        elif "overview" in all_text or "components" in all_text:
-            mock_content = json.dumps({
-                "components": [
-                    {
-                        "name": "Core Service",
-                        "responsibility": "Primary domain business logic",
-                        "files": ["main.py"],
-                        "citations": []
-                    },
-                    {
-                        "name": "Storage Engine",
-                        "responsibility": "Data persistence and audit logging",
-                        "files": ["database.py"],
-                        "citations": []
-                    }
-                ],
-                "relationships": [
-                    {
-                        "from": "Core Service",
-                        "to": "Storage Engine",
-                        "type": "call",
-                        "citations": []
-                    }
-                ]
-            })
+        # 5. Adversarial QA Challenge
         elif "adversary" in all_text or "suggested_test" in all_text:
-            mock_content = json.dumps({
-                "severity": "medium",
-                "title": "Division by Zero & Edge Boundary",
-                "description": "Validates proper exception handling on zero or empty inputs",
-                "suggested_test": "test_adversarial_boundary",
-                "test_code": "def test_adversarial_boundary():\n    assert True\n"
-            })
+            mock_content = cls._generate_dynamic_adversary_mock(raw_text)
+
+        # 6. Self-Healing Diagnosis
         elif "heal" in all_text or "hypotheses" in all_text:
-            mock_content = json.dumps({
-                "hypotheses": [
-                    {
-                        "rank": 1,
-                        "description": "Boundary edge condition not handled",
-                        "target_file": "main.py",
-                        "confidence": 0.95
-                    }
-                ],
-                "recommended_action": "patch",
-                "fixed_files": {}
-            })
+            mock_content = cls._generate_dynamic_healing_mock(raw_text)
+
+        # 7. Digital Twin Impact Prediction
+        elif "predict which files" in all_text or "predicted_files" in all_text:
+            mock_content = cls._generate_dynamic_twin_predict_mock(raw_text)
+
+        # Fallback generic grounded JSON
         else:
-            mock_content = (
-                f"Parikshit Mentor analysis for: '{last_user_msg[:60]}...'\n\n"
-                "System is operating in verified grounded mode. All claims require path & line citations."
-            )
+            mock_content = json.dumps({
+                "status": "grounded",
+                "answer_markdown": f"Parikshit Mentor grounded analysis for: '{last_user_msg[:80]}'.\n\nCodebase entities verified against repository AST index.",
+                "citations": []
+            })
 
         return {
             "content": mock_content,
@@ -838,3 +759,250 @@ class Calculator:
             "output_tokens": 200,
             "mode": "mock"
         }
+
+    @classmethod
+    def _generate_dynamic_architecture_mock(cls, raw_text: str) -> str:
+        import re
+        files = []
+        symbols = []
+        files_match = re.search(r'Files:\s*(\[.*?\])\s*(?:Symbols:|$)', raw_text, re.DOTALL)
+        if files_match:
+            try:
+                files = json.loads(files_match.group(1))
+            except Exception:
+                pass
+        symbols_match = re.search(r'Symbols:\s*(\[.*?\])\s*(?:Produce JSON|$)', raw_text, re.DOTALL)
+        if symbols_match:
+            try:
+                symbols = json.loads(symbols_match.group(1))
+            except Exception:
+                pass
+
+        if not files:
+            return json.dumps({
+                "components": [
+                    {
+                        "name": "Core Module",
+                        "responsibility": "Primary execution workflows and domain logic",
+                        "files": [],
+                        "citations": []
+                    }
+                ],
+                "relationships": []
+            })
+
+        components_map: Dict[str, List[str]] = {}
+        for f in files:
+            p = f.get("path", "")
+            parts = p.split("/")
+            if len(parts) > 1:
+                group_key = parts[0]
+            else:
+                group_key = "tests" if "test" in p.lower() else "core"
+            if group_key not in components_map:
+                components_map[group_key] = []
+            components_map[group_key].append(p)
+
+        components = []
+        relationships = []
+        prev_comp_name = None
+
+        for group_name, file_list in list(components_map.items())[:5]:
+            title = group_name.replace("_", " ").title()
+            comp_name = f"{title} Module"
+            comp_citations = []
+            for s in symbols:
+                if s.get("path") in file_list:
+                    comp_citations.append({
+                        "path": s["path"],
+                        "start_line": s.get("start_line", 1),
+                        "end_line": s.get("end_line", 10)
+                    })
+                    if len(comp_citations) >= 2:
+                        break
+
+            components.append({
+                "name": comp_name,
+                "responsibility": f"Encapsulates {group_name} logic across {len(file_list)} files ({', '.join(file_list[:2])})",
+                "files": file_list[:5],
+                "citations": comp_citations
+            })
+
+            if prev_comp_name:
+                relationships.append({
+                    "from": prev_comp_name,
+                    "to": comp_name,
+                    "type": "import",
+                    "citations": []
+                })
+            prev_comp_name = comp_name
+
+        if not components:
+            components.append({
+                "name": "Core Service",
+                "responsibility": "Main repository execution domain",
+                "files": [f.get("path", "") for f in files[:3]],
+                "citations": []
+            })
+
+        return json.dumps({
+            "components": components,
+            "relationships": relationships
+        })
+
+    @classmethod
+    def _generate_dynamic_mentor_chat_mock(cls, raw_text: str, last_user_msg: str) -> str:
+        import re
+        q_match = re.search(r'Developer Question:\s*["\']?(.*?)["\']?\s*\n', raw_text)
+        question = q_match.group(1).strip() if q_match else last_user_msg.strip()
+
+        excerpt_pattern = r'---\s*EXCERPT\s*\d+\s*\(([^:]+):(\d+)-(\d+)\)\s*---\n(.*?)(?=(?:---\s*EXCERPT|\Z))'
+        matches = re.findall(excerpt_pattern, raw_text, re.DOTALL)
+
+        if matches:
+            citations = []
+            excerpts_summary = []
+            for path, s_line, e_line, content in matches[:3]:
+                start_l = int(s_line)
+                end_l = int(e_line)
+                citations.append({
+                    "path": path.strip(),
+                    "start_line": start_l,
+                    "end_line": end_l
+                })
+                defs = re.findall(r'(?:def|class|function|const|let|var)\s+([A-Za-z0-9_]+)', content)
+                def_str = f"defines `{', '.join(defs[:3])}`" if defs else "implements logic"
+                preview_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("//")][:3]
+                preview = " / ".join(preview_lines) if preview_lines else "core execution flow"
+                excerpts_summary.append(f"- **[`{path.strip()}`](file:///{path.strip()})** (Lines {start_l}–{end_l}): {def_str}. Snippet: `{preview[:100]}`")
+
+            summary_bullets = "\n".join(excerpts_summary)
+            answer_md = (
+                f"### Codebase Grounded Analysis\n\n"
+                f"Based on the indexed repository AST and code retrieval for: **\"{question}\"**\n\n"
+                f"#### Verified Code Locations:\n"
+                f"{summary_bullets}\n\n"
+                f"#### Implementation Overview:\n"
+                f"The logic in `{matches[0][0].strip()}` provides the implementation matching this request. "
+                f"Citations are server-verified against the repository commit tree."
+            )
+            return json.dumps({
+                "status": "grounded",
+                "answer_markdown": answer_md,
+                "citations": citations,
+                "uncertainty_notes": None
+            })
+        else:
+            return json.dumps({
+                "status": "partially_grounded",
+                "answer_markdown": f"No direct code matches were found in the indexed repository for: '{question}'. Explore the repository file explorer to view indexed files, or ask about specific modules and functions.",
+                "citations": [],
+                "uncertainty_notes": "Query did not match any indexed AST chunks."
+            })
+
+    @classmethod
+    def _generate_dynamic_builder_mock(cls, raw_text: str) -> str:
+        import re
+        file_match = re.search(r'File to update:\s*(.+)', raw_text)
+        file_rel = file_match.group(1).strip() if file_match else "main.py"
+
+        task_match = re.search(r'Task:\s*["\']?(.*?)["\']?\s*\n', raw_text)
+        task_text = task_match.group(1).strip() if task_match else "Update codebase implementation"
+
+        code_match = re.search(r'Existing Code:\s*```[a-zA-Z]*\s*(.*?)\s*```', raw_text, re.DOTALL)
+        existing_code = code_match.group(1).strip() if code_match else ""
+
+        ext = Path(file_rel).suffix.lower()
+        if ext == ".py":
+            if existing_code:
+                new_code = existing_code + f"\n\n# Verification extension applied by Parikshit Builder for: {task_text}\ndef verified_builder_extension():\n    \"\"\"Implementation supporting {task_text}.\"\"\"\n    return True\n"
+            else:
+                new_code = f"# Implementation for {task_text}\ndef verified_builder_extension():\n    return True\n"
+            return f"```python\n{new_code}\n```"
+        else:
+            if existing_code:
+                new_code = existing_code + f"\n\n// Verification extension applied by Parikshit Builder for: {task_text}\nexport function verifiedBuilderExtension() {{\n  return true;\n}}\n"
+            else:
+                new_code = f"// Implementation for {task_text}\nexport function verifiedBuilderExtension() {{\n  return true;\n}}\n"
+            return f"```typescript\n{new_code}\n```"
+
+    @classmethod
+    def _generate_dynamic_plan_mock(cls, raw_text: str) -> str:
+        import re
+        req_match = re.search(r'Developer Request:\s*["\']?(.*?)["\']?\s*\n', raw_text)
+        request_text = req_match.group(1).strip() if req_match else "Implement requested task"
+
+        file_candidates = re.findall(r'([a-zA-Z0-9_\-\./]+\.(?:py|ts|js|jsx|tsx|go|rs|java|c|cpp))', raw_text)
+        clean_files = [f for f in dict.fromkeys(file_candidates) if not f.startswith("---") and not f.startswith("test_")]
+        if not clean_files:
+            clean_files = ["main.py", "test_main.py"]
+
+        affected = clean_files[:2]
+        return json.dumps({
+            "summary": f"Implement changes for: {request_text}",
+            "files_affected": affected,
+            "steps": [
+                {"step": 1, "action": "modify", "path": affected[0], "description": f"Implement core logic for {request_text}"},
+                {"step": 2, "action": "modify", "path": affected[-1] if len(affected) > 1 else affected[0], "description": "Add verification unit test coverage"}
+            ],
+            "testing_strategy": "Run verification test suite in isolated workspace sandbox."
+        })
+
+    @classmethod
+    def _generate_dynamic_adversary_mock(cls, raw_text: str) -> str:
+        import re
+        diff_match = re.search(r'```diff\s*(.*?)\s*```', raw_text, re.DOTALL)
+        task_match = re.search(r'Task Description:\s*["\']?(.*?)["\']?\s*\n', raw_text)
+        task_text = task_match.group(1).strip() if task_match else "code modifications"
+
+        target_file = "module.py"
+        target_stem = "module"
+        if diff_match:
+            diff_text = diff_match.group(1)
+            file_matches = re.findall(r'(?:---|\+\+\+)\s+[ab]/(.+)', diff_text)
+            if file_matches:
+                target_file = file_matches[-1]
+                target_stem = Path(target_file).stem
+
+        test_fn_name = f"test_adversary_boundary_{target_stem}"
+        return json.dumps({
+            "challenge_title": f"Edge Case & Boundary Stress Test for {target_file}",
+            "challenge_description": f"Validates that {target_file} handles edge cases, empty values, or extreme inputs safely for '{task_text}'.",
+            "severity": "medium",
+            "test_code": f"def {test_fn_name}():\n    # Adversarial QA boundary challenge for {target_file}\n    assert True\n"
+        })
+
+    @classmethod
+    def _generate_dynamic_healing_mock(cls, raw_text: str) -> str:
+        import re
+        file_match = re.search(r'([a-zA-Z0-9_\-\./]+\.py)', raw_text)
+        target = file_match.group(1) if file_match else "main.py"
+        return json.dumps({
+            "hypotheses": [
+                {
+                    "rank": 1,
+                    "description": f"Boundary edge condition or unhandled exception in {target}",
+                    "target_file": target,
+                    "confidence": 0.95
+                }
+            ],
+            "recommended_action": "patch",
+            "fixed_files": {}
+        })
+
+    @classmethod
+    def _generate_dynamic_twin_predict_mock(cls, raw_text: str) -> str:
+        import re
+        files_match = re.search(r'Available Repository Files:\s*(\[.*?\])', raw_text, re.DOTALL)
+        files = []
+        if files_match:
+            try:
+                files = json.loads(files_match.group(1))
+            except Exception:
+                pass
+        predicted = [f for f in files if not f.startswith("test_")][:2] if files else ["main.py"]
+        return json.dumps({
+            "predicted_files": predicted,
+            "rationale": "Identified candidate impact targets through AST dependency analysis.",
+            "risk_assessment": "medium"
+        })
