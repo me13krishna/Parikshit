@@ -43,7 +43,7 @@ async def main():
         print(f"\n[!] IAM AUTHENTICATION FAILED: {e}")
         sys.exit(1)
 
-    print("\n[2/2] Sending prompt to IBM watsonx.ai (Model: ibm/granite-3-8b-instruct)...")
+    print(f"\n[2/2] Sending prompt to IBM watsonx.ai (Model: {settings.LLM_DEFAULT_MODEL})...")
     prompt_messages = [
         {"role": "system", "content": "You are Parikshit, an expert AI software engineering teammate."},
         {"role": "user", "content": "Explain what Parikshit is in two concise sentences."}
@@ -56,7 +56,7 @@ async def main():
         print(res.get("content", "").strip())
         print("-" * 60)
         print(f"[*] Telemetry: Input Tokens={res.get('input_tokens')}, Output Tokens={res.get('output_tokens')}")
-        print("\n[✓] IBM watsonx.ai is fully operational and ready for live real-time demo!")
+        print("\n[PASS] IBM watsonx.ai is fully operational and ready for live real-time demo!")
     except Exception as e:
         print(f"\n[!] MODEL GENERATION FAILED: {e}")
         sys.exit(1)
