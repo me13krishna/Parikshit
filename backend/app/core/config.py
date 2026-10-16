@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # Security & Auth
     AUTH_DISABLED: bool = True
     PARIKSHIT_API_KEY: str = ""
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,https://parikshit-six.vercel.app,*"
 
     model_config = {
         "env_file": (str(Path(__file__).resolve().parent.parent.parent / ".env"), ".env"),
