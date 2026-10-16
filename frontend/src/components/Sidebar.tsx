@@ -148,18 +148,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const renderNavGroup = (
-    title: string,
     group: "workspace" | "core" | "audit",
     isCompact: boolean
   ) => {
     const items = NAV_ITEMS.filter((i) => i.group === group);
     return (
-      <div className="flex flex-col gap-1 w-full">
-        {!isCompact && (
-          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-semibold px-2 py-1 select-none">
-            {title}
-          </span>
-        )}
+      <div className="flex flex-col gap-0.5 w-full">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = isCurrentActive(item);
@@ -171,45 +165,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onTabChange(item.id);
                 setMobileDrawerOpen(false);
               }}
-              title={`${item.verb} – ${item.noun}: ${item.desc}`}
-              aria-label={`${item.verb}: ${item.noun}`}
+              title={`${item.noun}: ${item.desc}`}
+              aria-label={item.noun}
               className={`group relative flex items-center ${
                 isCompact
-                  ? "justify-center p-2.5"
-                  : "justify-between px-3 py-2"
-              } rounded-lg text-xs font-medium transition-all ${
+                  ? "justify-center p-2"
+                  : "justify-between px-2.5 py-1.5"
+              } rounded-md text-xs transition-all ${
                 isActive
-                  ? "bg-[var(--surface-2)] text-[var(--text-primary)] border border-[var(--border-subtle)] shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]/60 border border-transparent"
+                  ? "bg-[var(--surface-2)] text-[var(--text-primary)] font-medium"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]/50 font-normal"
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className={`p-1 rounded-md shrink-0 transition-colors ${
+                <Icon
+                  className={`w-4 h-4 shrink-0 transition-colors ${
                     isActive
-                      ? "text-[#5E6AD2] bg-[var(--surface-3)]"
-                      : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+                      ? "text-[#5E6AD2]"
+                      : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
                   }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
+                />
 
                 {!isCompact && (
-                  <div className="text-left min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`leading-tight truncate ${isActive ? "font-semibold text-[var(--text-primary)]" : "font-normal"}`}>
-                        {item.noun}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-[var(--text-muted)] block truncate">
-                      {item.verb}
-                    </span>
-                  </div>
+                  <span className="truncate tracking-tight leading-tight">
+                    {item.noun}
+                  </span>
                 )}
               </div>
 
               {isActive && !isCompact && (
-                <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#5E6AD2] shadow-[0_0_6px_rgba(94,106,210,0.5)]" />
+                <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#5E6AD2]" />
               )}
             </button>
           );
@@ -231,39 +216,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
             if (e.target === e.currentTarget) setMobileDrawerOpen(false);
           }}
         >
-          <div className="bg-[var(--surface-1)] border border-[var(--border-subtle)] rounded-2xl p-4 flex flex-col gap-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg overflow-hidden bg-[var(--surface-2)] p-1 flex items-center justify-center border border-[var(--border-subtle)]">
+          <div className="bg-[var(--surface-1)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col gap-3 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2.5 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md overflow-hidden bg-[var(--surface-2)] p-0.5 flex items-center justify-center border border-[var(--border-subtle)]">
                   <Image
                     src="/brand/mark.png"
                     alt="Parikshit"
-                    width={24}
-                    height={24}
+                    width={20}
+                    height={20}
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <div>
-                  <span className="font-sans font-bold text-xs tracking-wider text-[var(--text-primary)]">
-                    PARIKSHIT
-                  </span>
-                  <span className="text-[10px] text-[var(--text-muted)] block">
-                    AI Engineering Workspace
-                  </span>
-                </div>
+                <span className="font-sans font-bold text-xs tracking-wider text-[var(--text-primary)]">
+                  PARIKSHIT
+                </span>
               </div>
               <button
                 onClick={() => setMobileDrawerOpen(false)}
                 aria-label="Close navigation"
-                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]"
+                className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {renderNavGroup("Workspace", "workspace", false)}
-            {renderNavGroup("Development Loop", "core", false)}
-            {renderNavGroup("Verification & Audit", "audit", false)}
+            {renderNavGroup("workspace", false)}
+            <div className="h-px bg-[var(--border-subtle)] my-1" />
+            {renderNavGroup("core", false)}
+            <div className="h-px bg-[var(--border-subtle)] my-1" />
+            {renderNavGroup("audit", false)}
           </div>
         </div>
       )}
@@ -271,55 +253,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Desktop Left Rail Navigation */}
       <nav
         aria-label="Main Navigation"
-        className={`hidden md:flex flex-col justify-between shrink-0 transition-all duration-200 border-r border-[var(--border-subtle)] bg-[var(--surface-1)] p-3 z-30 select-none ${
-          collapsed ? "w-16" : "w-64"
+        className={`hidden md:flex flex-col justify-between shrink-0 transition-all duration-200 border-r border-[var(--border-subtle)] bg-[var(--surface-1)] p-2 z-30 select-none ${
+          collapsed ? "w-14" : "w-52"
         }`}
       >
-        <div className="flex flex-col gap-4">
-          {/* Logo Brand Header & Toggle */}
-          <div className="flex items-center justify-between px-1.5 py-1">
+        <div className="flex flex-col gap-2">
+          {/* Top: Logo & Collapse Button */}
+          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} px-1 py-1`}>
             {!collapsed ? (
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg overflow-hidden bg-[var(--surface-2)] p-1 flex items-center justify-center border border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md overflow-hidden bg-[var(--surface-2)] p-0.5 flex items-center justify-center border border-[var(--border-subtle)] shrink-0">
                   <Image
                     src="/brand/mark.png"
                     alt="Parikshit Logo"
-                    width={22}
-                    height={22}
+                    width={18}
+                    height={18}
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-sans font-bold text-xs tracking-wider text-[var(--text-primary)]">
-                      PARIKSHIT
-                    </span>
-                    <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[var(--surface-2)] text-[#5E6AD2] border border-[var(--border-subtle)]">
-                      v2.0
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[var(--text-muted)] truncate block">
-                    Precision Evidence
-                  </span>
-                </div>
+                <span className="font-sans font-semibold text-xs tracking-wider text-[var(--text-primary)]">
+                  WORKSPACE
+                </span>
               </div>
-            ) : (
-              <div className="w-7 h-7 rounded-lg overflow-hidden bg-[var(--surface-2)] p-1 flex items-center justify-center border border-[var(--border-subtle)] mx-auto">
-                <Image
-                  src="/brand/mark.png"
-                  alt="Parikshit Logo"
-                  width={20}
-                  height={20}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
+            ) : null}
 
             <button
               onClick={() => setCollapsed(!collapsed)}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-label={collapsed ? "Expand navigation rail" : "Collapse navigation rail"}
-              className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
             >
               {collapsed ? (
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -329,64 +291,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Repository Selector Dropdown Card */}
+          {/* Quick Repository Pill */}
           {!collapsed && (
-            <div
+            <button
               onClick={onSwitchRepo}
-              role="button"
-              tabIndex={0}
-              className="p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-xs cursor-pointer hover:border-[var(--border-hover)] transition-colors group"
+              className="w-full flex items-center justify-between px-2 py-1.5 rounded-md bg-[var(--surface-2)]/50 hover:bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group mb-1 text-left"
+              title="Click to switch workspace repository"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">
-                  Repository
-                </span>
-                <ChevronDown className="w-3 h-3 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
+              <div className="flex items-center gap-1.5 truncate">
+                <GitBranch className="w-3 h-3 text-[var(--text-muted)] group-hover:text-[#5E6AD2] shrink-0" />
+                <span className="truncate font-medium">{projectName}</span>
               </div>
-              <div className="flex items-center gap-2 text-[var(--text-primary)] font-medium text-xs mt-1 truncate">
-                <FileCode className="w-3.5 h-3.5 text-[#5E6AD2] shrink-0" />
-                <span className="truncate">{projectName}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] font-mono mt-1">
-                <GitBranch className="w-3 h-3 text-[var(--text-muted)]" />
-                <span>main</span>
-                {revisionId && (
-                  <span className="text-[var(--text-muted)]">
-                    • rev_{revisionId.slice(-6)}
-                  </span>
-                )}
-              </div>
-            </div>
+              <ChevronDown className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
+            </button>
           )}
 
-          {/* Navigation Items Grouped */}
-          <div className="flex flex-col gap-3.5 overflow-y-auto pr-0.5 max-h-[calc(100vh-280px)]">
-            {renderNavGroup("Workspace", "workspace", collapsed)}
-            {renderNavGroup("Development Loop", "core", collapsed)}
-            {renderNavGroup("Audit & Twin", "audit", collapsed)}
+          {/* Navigation Items */}
+          <div className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-140px)]">
+            {renderNavGroup("workspace", collapsed)}
+            <div className="h-px bg-[var(--border-subtle)] my-1" />
+            {renderNavGroup("core", collapsed)}
+            <div className="h-px bg-[var(--border-subtle)] my-1" />
+            {renderNavGroup("audit", collapsed)}
           </div>
         </div>
 
         {/* Rail Footer */}
-        <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2">
+        <div className="pt-2 border-t border-[var(--border-subtle)] flex flex-col gap-1">
           {!collapsed ? (
-            <div className="flex items-center justify-between">
-              <button
-                onClick={onOpenSettings}
-                className="flex items-center gap-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1.5 rounded-md hover:bg-[var(--surface-2)] transition-colors w-full"
-              >
-                <Settings className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                <span>Workspace Settings</span>
-              </button>
-            </div>
+            <button
+              onClick={onOpenSettings}
+              className="flex items-center gap-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-2.5 py-1.5 rounded-md hover:bg-[var(--surface-2)] transition-colors w-full"
+            >
+              <Settings className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <span>Settings</span>
+            </button>
           ) : (
             <button
               onClick={onOpenSettings}
               title="Settings"
               aria-label="Settings"
-              className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-md hover:bg-[var(--surface-2)] transition-colors mx-auto"
+              className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-md hover:bg-[var(--surface-2)] transition-colors mx-auto"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
