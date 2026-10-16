@@ -1,6 +1,6 @@
 # Start Parikshit locally
 Write-Host "Starting Parikshit Backend..." -ForegroundColor Cyan
-Start-Process -NoNewWindow powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\uvicorn.exe app.main:app --reload --port 8000"
+Start-Process -NoNewWindow powershell -ArgumentList "-NoExit", "-Command", "cd backend; python -m uvicorn app.main:app --reload --port 8000"
 
 Write-Host "Starting Parikshit Frontend..." -ForegroundColor Green
 Start-Process -NoNewWindow powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"

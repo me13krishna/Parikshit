@@ -144,6 +144,7 @@ async def get_tours(
 
 @router.get("/{project_id}/files")
 @router.get("/projects/{project_id}/files")
+@router.get("/mentor/{project_id}/files")
 async def list_files(project_id: str):
     db_path = get_db_path()
     async with aiosqlite.connect(db_path) as db:

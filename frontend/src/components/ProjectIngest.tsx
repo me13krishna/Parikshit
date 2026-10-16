@@ -105,10 +105,14 @@ export const ProjectIngest: React.FC<ProjectIngestProps> = ({
         }
         res = await api.uploadZip(zipFile, inputProjectName || zipFile.name.replace(".zip", ""));
       } else {
+        let uri = sourceUri.trim();
+        if (sourceType === "git" && !uri.startsWith("http://") && !uri.startsWith("https://")) {
+          uri = `https://${uri}`;
+        }
         res = await api.ingestProject({
           source_type: sourceType,
-          source_uri: sourceUri.trim(),
-          name: inputProjectName.trim() || "Imported Project",
+          source_uri: uri,
+          name: inputProjectName.trim() || uri.split("/").pop()?.replace(".git", "") || "Imported Project",
         });
       }
 
