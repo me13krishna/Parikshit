@@ -126,6 +126,13 @@ export interface TaskItem {
   updated_at: string;
 }
 
+export interface SandboxTestCase {
+  test_id: string;
+  outcome: "passed" | "failed" | "skipped";
+  duration_ms?: number;
+  message?: string;
+}
+
 export interface SandboxResult {
   run_id: string;
   task_id?: string;
@@ -136,6 +143,7 @@ export interface SandboxResult {
   duration_ms: number;
   created_at: string;
   is_unsandboxed?: boolean;
+  tests?: SandboxTestCase[];
 }
 
 export interface AdversarialChallenge {

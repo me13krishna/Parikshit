@@ -11,12 +11,21 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
 
     # LLM Gateway
-    LLM_PROVIDER: str = "openai"  # openai | anthropic | huggingface | mock
+    LLM_PROVIDER: str = "openai"  # watsonx | openai | anthropic | huggingface | mock
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     ANTHROPIC_API_KEY: str = ""
     HUGGINGFACE_API_KEY: str = ""
     HUGGINGFACE_BASE_URL: str = "https://router.huggingface.co/hf-inference/v1"
+
+    # IBM watsonx.ai
+    WATSONX_API_KEY: str = ""
+    WATSONX_PROJECT_ID: str = ""
+    WATSONX_URL: str = "https://us-south.ml.cloud.ibm.com"
+    WATSONX_VERSION: str = "2024-05-31"
+    WATSONX_DEFAULT_MODEL: str = "ibm/granite-3-8b-instruct"
+    WATSONX_EMBEDDING_MODEL: str = "ibm/slate-30m-english-rtrvr"
+
     LLM_DEFAULT_MODEL: str = "gpt-4o-mini"
     LLM_BUILDER_MODEL: str = "gpt-4o"
     LLM_ADVERSARY_MODEL: str = "gpt-4o"

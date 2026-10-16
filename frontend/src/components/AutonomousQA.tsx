@@ -9,13 +9,21 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { SandboxResult } from "../lib/types";
+import { SandboxResult, SandboxTestCase } from "../lib/types";
 import { api, ApiClientError } from "../lib/api";
 
 interface AutonomousQAProps {
   taskId?: string;
   onError: (err: ApiClientError) => void;
   onSendToHeal?: (runId: string) => void;
+}
+
+interface ParsedTestItem {
+  name: string;
+  file: string;
+  status: string;
+  duration: string;
+  message?: string;
 }
 
 export const AutonomousQA: React.FC<AutonomousQAProps> = ({
@@ -42,9 +50,9 @@ export const AutonomousQA: React.FC<AutonomousQAProps> = ({
   const isSuccess = result ? result.exit_code === 0 : null;
 
   // Derive real parsed test cases from sandbox execution results
-  const parsedTests = React.useMemo(() => {
+  const parsedTests: ParsedTestItem[] = React.useMemo(() => {
     if (result?.tests && result.tests.length > 0) {
-      return result.tests.map((t) => {
+      return result.tests.map((t: SandboxTestCase) => {
         const parts = t.test_id.split("::");
         const file = parts[0] || "test.py";
         const name = parts[1] || t.test_id;

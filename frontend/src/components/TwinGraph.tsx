@@ -30,7 +30,9 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
   const [sandboxResult, setSandboxResult] = useState<SandboxResult | null>(null);
 
   const onErrorRef = React.useRef(onError);
-  onErrorRef.current = onError;
+  useEffect(() => {
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     const fetchGraph = async () => {

@@ -37,9 +37,12 @@ export const LedgerTimeline: React.FC<LedgerTimelineProps> = ({
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
   const onErrorRef = React.useRef(onError);
-  onErrorRef.current = onError;
   const onVerifyChangeRef = React.useRef(onVerifyChange);
-  onVerifyChangeRef.current = onVerifyChange;
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+    onVerifyChangeRef.current = onVerifyChange;
+  });
 
   useEffect(() => {
     let ignore = false;

@@ -382,7 +382,25 @@ class IndexerService:
                 fn_matches = re.finditer(r"(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)", content)
                 for m in fn_matches:
                     line_no = content[:m.start()].count("\n") + 1
-                    symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": min(line_no + 15, len(lines))})
+                    end_no = min(line_no + 15, len(lines))
+                    symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": end_no})
+                    chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
+
+                arrow_matches = re.finditer(r"(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>", content)
+                for m in arrow_matches:
+                    line_no = content[:m.start()].count("\n") + 1
+                    end_no = min(line_no + 15, len(lines))
+                    if not any(s["name"] == m.group(1) for s in symbols):
+                        symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": end_no})
+                        chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
+
+                class_matches = re.finditer(r"(?:export\s+)?class\s+([a-zA-Z0-9_$]+)", content)
+                for m in class_matches:
+                    line_no = content[:m.start()].count("\n") + 1
+                    end_no = min(line_no + 20, len(lines))
+                    if not any(s["name"] == m.group(1) for s in symbols):
+                        symbols.append({"name": m.group(1), "kind": "class", "start_line": line_no, "end_line": end_no})
+                        chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
 
                 imp_matches = re.finditer(r"import\s+.*?\s+from\s+['\"](.*?)['\"]", content)
                 for m in imp_matches:

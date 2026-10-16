@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import uuid
 import asyncio
@@ -18,11 +19,16 @@ from app.db.database import get_db_path
 T = TypeVar("T", bound=BaseModel)
 
 class LLMGateway:
+    _cached_iam_token: Optional[str] = None
+    _cached_iam_expires_at: float = 0.0
+
     @classmethod
     def is_configured(cls) -> bool:
         provider = settings.LLM_PROVIDER.lower()
         if provider == "mock":
             return True
+        if provider in ["watsonx", "ibm"]:
+            return bool(settings.WATSONX_API_KEY and settings.WATSONX_PROJECT_ID)
         if provider == "openai":
             return bool(settings.OPENAI_API_KEY or "localhost" in settings.OPENAI_BASE_URL)
         if provider == "anthropic":
@@ -31,12 +37,22 @@ class LLMGateway:
             return bool(settings.HUGGINGFACE_API_KEY or "localhost" in settings.HUGGINGFACE_BASE_URL)
         return False
     """
-    LLM Gateway abstraction layer supporting Mock, OpenAI (or OpenAI-compatible, Ollama),
+    LLM Gateway abstraction layer supporting Mock, IBM watsonx.ai, OpenAI (or OpenAI-compatible, Ollama),
     Anthropic Messages API, and Hugging Face Inference API / router, with token budget tracking.
     """
 
     @staticmethod
     def get_role_model(role: Optional[str] = None) -> str:
+        provider = settings.LLM_PROVIDER.lower()
+        if provider in ["watsonx", "ibm"]:
+            if role == "builder" and settings.LLM_BUILDER_MODEL and "gpt" not in settings.LLM_BUILDER_MODEL:
+                return settings.LLM_BUILDER_MODEL
+            if role == "adversary" and settings.LLM_ADVERSARY_MODEL and "gpt" not in settings.LLM_ADVERSARY_MODEL:
+                return settings.LLM_ADVERSARY_MODEL
+            if role == "reviewer" and settings.LLM_REVIEWER_MODEL and "gpt" not in settings.LLM_REVIEWER_MODEL:
+                return settings.LLM_REVIEWER_MODEL
+            return settings.WATSONX_DEFAULT_MODEL
+
         if role == "builder" and settings.LLM_BUILDER_MODEL:
             return settings.LLM_BUILDER_MODEL
         if role == "adversary" and settings.LLM_ADVERSARY_MODEL:
@@ -116,6 +132,20 @@ class LLMGateway:
             res["mode"] = "live"
             await cls._record_usage(
                 target_model, "huggingface", res.get("input_tokens", 0), res.get("output_tokens", 0), session_id
+            )
+            return res
+
+        if provider in ["watsonx", "ibm"]:
+            if not settings.WATSONX_API_KEY or not settings.WATSONX_PROJECT_ID:
+                raise AppError(
+                    "WATSONX_API_KEY and WATSONX_PROJECT_ID are not configured",
+                    code="LLM_NOT_CONFIGURED",
+                    status_code=500
+                )
+            res = await cls._call_watsonx(messages, target_model, temperature, response_format)
+            res["mode"] = "live"
+            await cls._record_usage(
+                target_model, "watsonx", res.get("input_tokens", 0), res.get("output_tokens", 0), session_id
             )
             return res
 
@@ -241,7 +271,33 @@ class LLMGateway:
             except Exception as e:
                 logger.debug(f"OpenAI embeddings endpoint fallback: {e}")
 
-        # 3. Deterministic Token-Hash Pseudo-Embedding Fallback (Offline / Mock Mode)
+        # 3. IBM watsonx.ai Embeddings
+        if provider in ["watsonx", "ibm"] and settings.WATSONX_API_KEY and settings.WATSONX_PROJECT_ID:
+            emb_model = model or settings.WATSONX_EMBEDDING_MODEL
+            try:
+                token = await cls._get_iam_token()
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+                base_url = settings.WATSONX_URL.rstrip("/")
+                emb_url = f"{base_url}/ml/v1/text/embeddings?version={settings.WATSONX_VERSION}"
+                payload = {
+                    "model_id": emb_model,
+                    "project_id": settings.WATSONX_PROJECT_ID,
+                    "inputs": texts
+                }
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(emb_url, headers=headers, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        results_list = data.get("results", [])
+                        if results_list and "embedding" in results_list[0]:
+                            return [item["embedding"] for item in results_list]
+            except Exception as e:
+                logger.debug(f"Watsonx embedding endpoint fallback: {e}")
+
+        # 4. Deterministic Token-Hash Pseudo-Embedding Fallback (Offline / Mock Mode)
         # Generates a normalized 64-dimensional float vector based on sha256 term hashing
         results = []
         dim = 64
@@ -259,6 +315,183 @@ class LLMGateway:
                 vec = [x / norm for x in vec]
             results.append(vec)
         return results
+
+    @classmethod
+    async def _get_iam_token(cls) -> str:
+        """
+        Retrieves or refreshes an IBM Cloud IAM bearer token using WATSONX_API_KEY.
+        Caches the token until 60 seconds before expiration.
+        """
+        now = time.time()
+        if cls._cached_iam_token and now < (cls._cached_iam_expires_at - 60):
+            return cls._cached_iam_token
+
+        if not settings.WATSONX_API_KEY:
+            raise AppError(
+                "WATSONX_API_KEY is not configured",
+                code="LLM_NOT_CONFIGURED",
+                status_code=500
+            )
+
+        token_url = "https://iam.cloud.ibm.com/identity/token"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        data = {
+            "grant_type": "urn:ibm:params:oauth:grant-type:apikey",
+            "apikey": settings.WATSONX_API_KEY
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(token_url, headers=headers, data=data)
+                if resp.status_code != 200:
+                    logger.error(f"Failed to authenticate with IBM Cloud IAM: HTTP {resp.status_code}")
+                    raise AppError(
+                        "IBM Cloud authentication failed. Please verify your WATSONX_API_KEY.",
+                        code="LLM_AUTH_FAILED",
+                        status_code=401
+                    )
+                token_data = resp.json()
+                token = token_data.get("access_token")
+                expires_in = token_data.get("expires_in", 3600)
+                if not token:
+                    raise AppError(
+                        "No access_token returned from IBM Cloud IAM",
+                        code="LLM_AUTH_FAILED",
+                        status_code=401
+                    )
+                cls._cached_iam_token = token
+                cls._cached_iam_expires_at = now + float(expires_in)
+                return token
+        except AppError:
+            raise
+        except Exception as e:
+            logger.error(f"Network error contacting IBM IAM: {e}")
+            raise AppError(
+                "Network error connecting to IBM Cloud authentication service.",
+                code="LLM_NETWORK_ERROR",
+                status_code=502
+            )
+
+    @classmethod
+    async def _call_watsonx(
+        cls,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        response_format: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes a chat completion via IBM watsonx.ai REST endpoints.
+        Supports /ml/v1/text/chat and automatic text/generation fallback.
+        """
+        if not settings.WATSONX_PROJECT_ID:
+            raise AppError(
+                "WATSONX_PROJECT_ID is not configured",
+                code="LLM_NOT_CONFIGURED",
+                status_code=500
+            )
+
+        token = await cls._get_iam_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        base_url = settings.WATSONX_URL.rstrip("/")
+        version = settings.WATSONX_VERSION
+        chat_url = f"{base_url}/ml/v1/text/chat?version={version}"
+
+        payload: Dict[str, Any] = {
+            "model_id": model,
+            "project_id": settings.WATSONX_PROJECT_ID,
+            "messages": messages,
+            "parameters": {
+                "temperature": temperature,
+                "max_new_tokens": 4096
+            }
+        }
+
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=90.0) as client:
+                    resp = await client.post(chat_url, headers=headers, json=payload)
+
+                    if resp.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+
+                    # If 404 (endpoint differences), fallback to text/generation endpoint
+                    if resp.status_code == 404 and attempt == 0:
+                        alt_url = f"{base_url}/ml/v1/text/generation?version={version}"
+                        prompt_str = "\n".join(f"{m['role'].capitalize()}: {m['content']}" for m in messages) + "\nAssistant:"
+                        gen_payload = {
+                            "model_id": model,
+                            "project_id": settings.WATSONX_PROJECT_ID,
+                            "input": prompt_str,
+                            "parameters": {
+                                "temperature": temperature,
+                                "max_new_tokens": 4096
+                            }
+                        }
+                        gen_resp = await client.post(alt_url, headers=headers, json=gen_payload)
+                        if gen_resp.status_code == 200:
+                            gen_data = gen_resp.json()
+                            results = gen_data.get("results", [])
+                            content = results[0].get("generated_text", "") if results else ""
+                            input_tokens = gen_data.get("results", [{}])[0].get("input_token_count", 0)
+                            output_tokens = gen_data.get("results", [{}])[0].get("generated_token_count", 0)
+                            return {
+                                "content": content,
+                                "role": "assistant",
+                                "model": model,
+                                "input_tokens": input_tokens,
+                                "output_tokens": output_tokens
+                            }
+
+                    if resp.status_code == 401 and attempt < 2:
+                        cls._cached_iam_token = None
+                        cls._cached_iam_expires_at = 0.0
+                        token = await cls._get_iam_token()
+                        headers["Authorization"] = f"Bearer {token}"
+                        continue
+
+                    resp.raise_for_status()
+                    data = resp.json()
+
+                    if "choices" in data and len(data["choices"]) > 0:
+                        content = data["choices"][0].get("message", {}).get("content", "")
+                    elif "results" in data and len(data["results"]) > 0:
+                        content = data["results"][0].get("generated_text", "")
+                    else:
+                        content = str(data)
+
+                    usage = data.get("usage", {})
+                    return {
+                        "content": content,
+                        "role": "assistant",
+                        "model": model,
+                        "input_tokens": usage.get("prompt_tokens", 0) or usage.get("input_token_count", 0),
+                        "output_tokens": usage.get("completion_tokens", 0) or usage.get("generated_token_count", 0)
+                    }
+
+            except httpx.HTTPStatusError as e:
+                clean_err = e.response.text[:300]
+                if attempt == 2:
+                    raise AppError(
+                        f"IBM watsonx.ai API error (HTTP {e.response.status_code}): {clean_err}",
+                        code="LLM_API_ERROR",
+                        status_code=502
+                    )
+            except Exception as exc:
+                if attempt == 2:
+                    raise AppError(
+                        f"IBM watsonx.ai connection error: {exc}",
+                        code="LLM_NETWORK_ERROR",
+                        status_code=502
+                    )
+                await asyncio.sleep(1)
+
+        raise AppError("IBM watsonx.ai call failed after retries", code="LLM_API_ERROR", status_code=502)
 
 
     @classmethod

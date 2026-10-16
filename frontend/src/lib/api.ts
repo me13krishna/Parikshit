@@ -11,6 +11,7 @@ import {
   HealResult,
   TwinImpact,
   TwinNode,
+  TwinEdge,
   ApiError
 } from "./types";
 
