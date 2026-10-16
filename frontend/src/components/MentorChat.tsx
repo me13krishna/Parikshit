@@ -45,14 +45,15 @@ export const MentorChat: React.FC<MentorChatProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
-  // Context sidebar: Architecture & Tours
-  const [activeSidePanel, setActiveSidePanel] = useState<"architecture" | "tours">("architecture");
+  // Context sidebar: Architecture, Tours & Starter Tasks
+  const [activeSidePanel, setActiveSidePanel] = useState<"architecture" | "tours" | "starter">("architecture");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [tours, setTours] = useState<TourItem[]>([]);
+  const [starterTasks, setStarterTasks] = useState<Array<{ id: string; title: string; rationale?: string; risk_level?: string; status?: string }>>([]);
   const [repoFiles, setRepoFiles] = useState<{ name: string; lines: number; role?: string }[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>("");
 
-  // Load real files, architecture & tours on revisionId / projectId change
+  // Load real files, architecture, tours & starter tasks on revisionId / projectId change
   useEffect(() => {
     let ignore = false;
     const fetchContext = async () => {
@@ -86,6 +87,14 @@ export const MentorChat: React.FC<MentorChatProps> = ({
         const trs = await api.getTours(revisionId || "default");
         if (!ignore && trs) setTours(trs);
       } catch {}
+
+      // 4. Fetch suggested starter tasks for newcomers
+      if (projectId) {
+        try {
+          const st = await api.getStarterTasks(projectId);
+          if (!ignore && st && st.length > 0) setStarterTasks(st);
+        } catch {}
+      }
     };
 
     fetchContext();
@@ -353,7 +362,7 @@ export const MentorChat: React.FC<MentorChatProps> = ({
           <div className="flex items-center gap-1 bg-[var(--surface-2)] p-1 rounded-lg border border-[var(--border-subtle)]">
             <button
               onClick={() => setActiveSidePanel("architecture")}
-              className={`flex-1 py-1 text-[11px] rounded font-medium transition-colors ${
+              className={`flex-1 py-1 text-[10px] rounded font-medium transition-colors ${
                 activeSidePanel === "architecture"
                   ? "bg-[var(--surface-3)] text-[var(--text-primary)] font-semibold"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -363,13 +372,23 @@ export const MentorChat: React.FC<MentorChatProps> = ({
             </button>
             <button
               onClick={() => setActiveSidePanel("tours")}
-              className={`flex-1 py-1 text-[11px] rounded font-medium transition-colors ${
+              className={`flex-1 py-1 text-[10px] rounded font-medium transition-colors ${
                 activeSidePanel === "tours"
                   ? "bg-[var(--surface-3)] text-[var(--text-primary)] font-semibold"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
-              Code Tours
+              Tours
+            </button>
+            <button
+              onClick={() => setActiveSidePanel("starter")}
+              className={`flex-1 py-1 text-[10px] rounded font-medium transition-colors ${
+                activeSidePanel === "starter"
+                  ? "bg-[var(--surface-3)] text-[var(--text-primary)] font-semibold"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Starter Tasks
             </button>
           </div>
 
@@ -406,7 +425,7 @@ export const MentorChat: React.FC<MentorChatProps> = ({
                   </div>
                 )}
               </div>
-            ) : (
+            ) : activeSidePanel === "tours" ? (
               <div className="space-y-3">
                 <span className="text-[10px] font-mono uppercase text-[var(--text-muted)] block">
                   User Journey Tours
@@ -443,6 +462,59 @@ export const MentorChat: React.FC<MentorChatProps> = ({
                       <span>Start Tour</span>
                       <ChevronRight className="w-3 h-3" />
                     </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <span className="text-[10px] font-mono uppercase text-[var(--text-muted)] block">
+                  Newcomer Starter Tasks
+                </span>
+                {starterTasks && starterTasks.length > 0 ? (
+                  starterTasks.map((st) => (
+                    <div
+                      key={st.id}
+                      className="p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-semibold text-[var(--text-primary)] text-xs leading-tight">
+                          {st.title}
+                        </div>
+                        <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-950/60 text-[#34D399] border border-emerald-800/40 shrink-0 font-bold">
+                          {st.risk_level || "low"}
+                        </span>
+                      </div>
+                      {st.rationale && (
+                        <p className="text-[11px] text-[var(--text-secondary)] leading-snug">
+                          {st.rationale}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleSend(`How do I complete starter task: "${st.title}"? Please cite the exact files and lines.`)}
+                        className="text-[10px] text-[#5E6AD2] hover:underline flex items-center gap-1 pt-1 font-mono"
+                      >
+                        <span>Explain in Chat</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="space-y-2">
+                    <div className="p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] space-y-1.5">
+                      <div className="font-semibold text-[var(--text-primary)] text-xs">
+                        Explore Entrypoints & Invariants
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        Learn core module responsibilities and exception invariants.
+                      </p>
+                      <button
+                        onClick={() => handleSend("Explain key codebase entrypoints for a new contributor with exact line citations")}
+                        className="text-[10px] text-[#5E6AD2] hover:underline flex items-center gap-1 pt-1 font-mono"
+                      >
+                        <span>Start Task</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

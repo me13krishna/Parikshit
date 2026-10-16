@@ -189,6 +189,13 @@ export const api = {
     return res.files || [];
   },
 
+  async getStarterTasks(projectId: string): Promise<Array<{ id: string; title: string; rationale?: string; risk_level?: string; status?: string }>> {
+    const res = await request<{ starter_tasks: Array<{ id: string; title: string; rationale?: string; risk_level?: string; status?: string }> }>(
+      `/projects/${encodeURIComponent(projectId)}/starter-tasks`
+    );
+    return res.starter_tasks || [];
+  },
+
   // Tasks & Builder
   async createTask(projectId: string, requestText: string): Promise<TaskItem> {
     const res = await request<Record<string, unknown>>("/tasks", {
