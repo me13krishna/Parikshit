@@ -106,19 +106,19 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-16">
+    <div className="max-w-6xl mx-auto space-y-6 pb-16">
       {/* Header Context */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#29313D]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-[#191F2B] text-[#6AD7FA] border border-[#29313D]">
+          <div className="p-1.5 rounded-lg bg-[var(--surface-2)] text-[#2DD4BF] border border-[var(--border-subtle)]">
             <GitFork className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-xs font-semibold text-[#F4F6FA] font-display">
+            <h2 className="text-xs font-semibold text-[var(--text-primary)] font-sans">
               Software Digital Twin
             </h2>
-            <p className="text-[11px] text-[#929BAA]">
-              AST entity dependency graphs, blast-radius impact simulation, and affected test suites
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              Real-time AST node-link graph with blast-radius ripple prediction
             </p>
           </div>
         </div>
@@ -126,31 +126,33 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
         <button
           onClick={handleRunVerificationChecks}
           disabled={sandboxRunning}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#191F2B] hover:bg-[#222B3D] text-[#F4F6FA] text-xs font-mono border border-[#29313D] transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-primary)] text-xs font-mono border border-[var(--border-subtle)] transition-colors self-start sm:self-auto"
         >
           {sandboxRunning ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#5E6AD2]" />
           ) : (
-            <Terminal className="w-3.5 h-3.5 text-[#C6F36B]" />
+            <Terminal className="w-3.5 h-3.5 text-[#2DD4BF]" />
           )}
-          <span>Execute Sandbox Suite</span>
+          <span>Run Sandbox Checks</span>
         </button>
       </div>
 
-      {/* Main Grid: AST Entities & Impact Predictor */}
+      {/* Main Grid: File / Entity Index & Blast Radius Visualizer */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Tracked Entities Rail */}
-        <section className="rounded-xl border border-[#29313D] bg-[#121720] p-4 space-y-3 shadow-xl">
-          <div className="flex items-center justify-between pb-2 border-b border-[#29313D]">
-            <span className="text-xs font-mono font-semibold text-[#F4F6FA]">
-              AST Entities ({nodes.length})
+        {/* Entity File Tree */}
+        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] p-4 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
+            <span className="text-xs font-mono uppercase text-[var(--text-muted)] font-semibold">
+              AST Indexed Entities
             </span>
-            <span className="text-[10px] text-[#5E697A] font-mono">Call Graph</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)]">
+              {nodes.length} nodes
+            </span>
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-[#5E697A] text-xs flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-[#C6F36B]" />
+            <div className="p-8 text-center text-[var(--text-muted)] text-xs flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-[#5E6AD2]" />
               <span>Indexing AST graph...</span>
             </div>
           ) : (
@@ -163,15 +165,15 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                     onClick={() => setSelectedFile(n.label || n.id)}
                     className={`w-full text-left px-3 py-2 rounded-lg text-xs font-mono flex items-center justify-between transition-all ${
                       isSelected
-                        ? "bg-[#191F2B] text-[#C6F36B] border border-[#29313D]"
-                        : "text-[#929BAA] hover:bg-[#191F2B]/60 hover:text-[#F4F6FA] border border-transparent"
+                        ? "bg-[var(--surface-2)] text-[#5E6AD2] border border-[var(--border-hover)] font-medium"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--surface-2)]/60 hover:text-[var(--text-primary)] border border-transparent"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <FileCode className="w-3.5 h-3.5 shrink-0 text-[#5E697A]" />
+                      <FileCode className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]" />
                       <span className="truncate">{n.label || n.id}</span>
                     </div>
-                    <span className="text-[10px] text-[#5E697A] shrink-0 ml-1">
+                    <span className="text-[10px] text-[var(--text-muted)] shrink-0 ml-1">
                       {n.type}
                     </span>
                   </button>
@@ -182,13 +184,13 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
         </section>
 
         {/* Blast-Radius Simulator Cockpit */}
-        <section className="md:col-span-2 rounded-xl border border-[#29313D] bg-[#121720] p-5 space-y-4 border-active-top shadow-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#29313D]">
+        <section className="md:col-span-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] p-5 space-y-4 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
             <div>
-              <span className="text-[10px] text-[#5E697A] font-mono uppercase tracking-wider">
+              <span className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-wider">
                 Simulation Target
               </span>
-              <div className="text-xs font-mono font-semibold text-[#F4F6FA] mt-0.5">
+              <div className="text-xs font-mono font-semibold text-[var(--text-primary)] mt-0.5">
                 {selectedFile || "None selected"}
               </div>
             </div>
@@ -196,7 +198,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
             <button
               onClick={handleSimulate}
               disabled={!selectedFile || simulating}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#C6F36B] hover:bg-[#b5e655] disabled:opacity-50 text-[#0B0D12] text-xs font-semibold transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-50 text-[var(--bg-primary)] text-xs font-semibold transition-opacity shadow-sm"
             >
               {simulating ? (
                 <>
@@ -213,18 +215,18 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
           </div>
 
           {/* Interactive Digital Twin Dependency Canvas */}
-          <div className="rounded-lg bg-[#0B0D12] border border-[#29313D] p-3 overflow-hidden relative">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#29313D]/50 text-[11px] font-mono">
-              <span className="text-[#929BAA] flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#C6F36B]" />
+          <div className="rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] p-3 overflow-hidden relative">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border-subtle)] text-[11px] font-mono">
+              <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#2DD4BF]" />
                 Interactive Dependency Graph ({nodes.length} nodes, {edges.length} edges)
               </span>
-              <div className="flex items-center gap-3 text-[10px] text-[#5E697A]">
+              <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#C6F36B]" /> Source
+                  <span className="w-2 h-2 rounded-full bg-[#2DD4BF]" /> Source
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#6AD7FA]" /> Test
+                  <span className="w-2 h-2 rounded-full bg-[#5E6AD2]" /> Test
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-rose-400" /> Impacted
@@ -243,7 +245,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                   markerHeight="6"
                   orient="auto-start-reverse"
                 >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5E697A" />
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,255,255,0.2)" />
                 </marker>
               </defs>
 
@@ -262,7 +264,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                     y1={srcCoord.y}
                     x2={tgtCoord.x}
                     y2={tgtCoord.y}
-                    stroke={isEdgeImpacted ? "#F43F5E" : "#29313D"}
+                    stroke={isEdgeImpacted ? "#F43F5E" : "var(--border-subtle)"}
                     strokeWidth={isEdgeImpacted ? "2" : "1.2"}
                     strokeDasharray={isEdgeImpacted ? "4 2" : undefined}
                     markerEnd="url(#twin-arrow)"
@@ -276,7 +278,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                 const isSelected = selectedFile === (n.path || n.label || n.id);
                 const isImpacted = impact?.affected_files?.includes(n.path || "") || false;
                 const isTest = n.kind === "test" || (n.path && n.path.includes("test"));
-                const nodeColor = isImpacted ? "#F43F5E" : isTest ? "#6AD7FA" : "#C6F36B";
+                const nodeColor = isImpacted ? "#F43F5E" : isTest ? "#5E6AD2" : "#2DD4BF";
 
                 return (
                   <g
@@ -300,7 +302,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                       cx={pos.x}
                       cy={pos.y}
                       r={10}
-                      fill="#121720"
+                      fill="var(--surface-1)"
                       stroke={nodeColor}
                       strokeWidth="2"
                     />
@@ -309,7 +311,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                       y={pos.y + 19}
                       textAnchor="middle"
                       className={`text-[9px] font-mono fill-current ${
-                        isSelected ? "text-[#C6F36B] font-bold" : isImpacted ? "text-rose-400 font-semibold" : "text-[#929BAA]"
+                        isSelected ? "text-[#5E6AD2] font-bold" : isImpacted ? "text-rose-400 font-semibold" : "text-[var(--text-muted)]"
                       }`}
                     >
                       {n.label.length > 16 ? n.label.slice(0, 14) + "..." : n.label}
@@ -324,25 +326,25 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
           {impact && (
             <div className="space-y-4 animate-in fade-in">
               <div className="grid grid-cols-2 gap-3 font-mono text-xs">
-                <div className="p-3.5 rounded-lg bg-[#0B0D12] border border-[#29313D]">
-                  <span className="text-[#5E697A] text-[10px] block">
+                <div className="p-3.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)]">
+                  <span className="text-[var(--text-muted)] text-[10px] block">
                     Blast Radius Score
                   </span>
-                  <span className="text-2xl font-bold text-[#F4F6FA] mt-0.5 block">
+                  <span className="text-2xl font-bold text-[var(--text-primary)] mt-0.5 block">
                     {impact.blast_radius_score}
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-lg bg-[#0B0D12] border border-[#29313D]">
-                  <span className="text-[#5E697A] text-[10px] block">Risk Classification</span>
+                <div className="p-3.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)]">
+                  <span className="text-[var(--text-muted)] text-[10px] block">Risk Classification</span>
                   <div className="mt-1">
                     <span
                       className={`text-xs font-bold uppercase px-2.5 py-0.5 rounded-full inline-block border ${
                         impact.risk_level === "high"
-                          ? "bg-rose-950 text-rose-300 border-rose-800"
+                          ? "bg-rose-950/40 text-rose-300 border-rose-800/40"
                           : impact.risk_level === "medium"
-                          ? "bg-amber-950 text-amber-300 border-amber-800"
-                          : "bg-emerald-950 text-[#39D98A] border-emerald-800"
+                          ? "bg-amber-950/40 text-amber-300 border-amber-800/40"
+                          : "bg-emerald-950/40 text-[#34D399] border-emerald-800/40"
                       }`}
                     >
                       {impact.risk_level} Risk
@@ -352,7 +354,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
               </div>
 
               <div>
-                <span className="text-xs font-mono text-[#F4F6FA] block mb-2 font-medium">
+                <span className="text-xs font-mono text-[var(--text-primary)] block mb-2 font-medium">
                   Downstream Dependent Files:
                 </span>
                 <ul className="space-y-1.5 font-mono text-xs">
@@ -360,14 +362,14 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
                     impact.affected_files.map((af, i) => (
                       <li
                         key={i}
-                        className="p-2.5 rounded-lg bg-[#0B0D12] border border-[#29313D] text-[#F4F6FA] flex items-center gap-2"
+                        className="p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center gap-2"
                       >
-                        <GitFork className="w-3.5 h-3.5 text-[#C6F36B]" />
+                        <GitFork className="w-3.5 h-3.5 text-[#5E6AD2]" />
                         <span>{af}</span>
                       </li>
                     ))
                   ) : (
-                    <li className="text-[#5E697A] text-xs italic p-2">
+                    <li className="text-[var(--text-muted)] text-xs italic p-2">
                       Zero downstream dependencies affected. Isolated modification.
                     </li>
                   )}
@@ -376,14 +378,14 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
 
               {impact.affected_tests && impact.affected_tests.length > 0 && (
                 <div>
-                  <span className="text-xs font-mono text-[#F4F6FA] block mb-2 font-medium">
+                  <span className="text-xs font-mono text-[var(--text-primary)] block mb-2 font-medium">
                     Affected Test Suites:
                   </span>
                   <div className="flex flex-wrap gap-1.5 font-mono text-xs">
                     {impact.affected_tests.map((tst, ti) => (
                       <span
                         key={ti}
-                        className="px-2.5 py-1 rounded bg-[#0B0D12] border border-[#29313D] text-[#39D98A]"
+                        className="px-2.5 py-1 rounded bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[#34D399]"
                       >
                         {tst}
                       </span>
@@ -395,7 +397,7 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
           )}
 
           {!impact && !simulating && (
-            <div className="p-8 text-center text-xs text-[#5E697A] rounded-xl bg-[#0B0D12] border border-[#29313D]">
+            <div className="p-8 text-center text-xs text-[var(--text-muted)] rounded-xl bg-[var(--surface-2)] border border-[var(--border-subtle)]">
               Click &ldquo;Simulate Blast Radius&rdquo; to predict downstream dependencies and affected test suites before modifying code.
             </div>
           )}
@@ -404,8 +406,8 @@ export const TwinGraph: React.FC<TwinGraphProps> = ({ revisionId, onError }) => 
 
       {/* Sandbox Test Execution Panel */}
       {sandboxResult && (
-        <section className="rounded-xl border border-[#29313D] bg-[#121720] p-5 shadow-xl">
-          <div className="text-xs font-semibold text-[#F4F6FA] mb-2 font-display">
+        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] p-5 shadow-xl">
+          <div className="text-xs font-semibold text-[var(--text-primary)] mb-2 font-sans">
             Sandbox Verification Output
           </div>
           <SandboxResults result={sandboxResult} />

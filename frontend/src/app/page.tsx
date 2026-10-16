@@ -213,6 +213,7 @@ export default function ParikshitCockpit() {
               onGlobalAiQuery={handleGlobalAiQuery}
               projectName={projectName}
               revisionId={revisionId}
+              projectId={projectId}
               health={health}
               ledgerStatus={ledgerStatus}
             />

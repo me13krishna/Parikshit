@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#00030F",
-  colorScheme: "dark",
+  themeColor: "#08090A",
+  colorScheme: "dark light",
   width: "device-width",
   initialScale: 1,
 };
@@ -58,11 +58,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Sora:wght@100..800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&family=JetBrains+Mono:ital,wght@0,300..700;1,300..700&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased min-h-screen text-[var(--color-text-100)] bg-[var(--color-ink-950)] selection:bg-[var(--color-cyan-300)]/20 selection:text-[var(--color-cyan-300)]">
+      <body className="antialiased min-h-screen">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--color-ink-800)] focus:text-[var(--color-cyan-300)] focus:border focus:border-[var(--color-cyan-300)] focus:rounded-md focus:shadow-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-300)]"
