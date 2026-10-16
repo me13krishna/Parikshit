@@ -73,7 +73,13 @@ async def get_overview(
             cursor = await db.execute("SELECT id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
             rev = await cursor.fetchone()
         if not rev:
-            return error_response("No revision found for project", code="NOT_FOUND", status_code=404)
+            return success_response({
+                "summary": "Connect a workspace or load the demo repository to explore architecture.",
+                "entry_points": [],
+                "core_modules": [],
+                "key_data_flows": [],
+                "dependencies": []
+            })
 
         rev_id = rev["id"]
 
@@ -130,7 +136,7 @@ async def get_tours(
             cursor = await db.execute("SELECT id FROM repo_revisions ORDER BY indexed_at DESC LIMIT 1;")
             rev = await cursor.fetchone()
         if not rev:
-            return error_response("No revision found for project", code="NOT_FOUND", status_code=404)
+            return success_response({"tours": []})
         rev_id = rev["id"]
 
     tours = await MentorService.generate_guided_tours(revision_id=rev_id)

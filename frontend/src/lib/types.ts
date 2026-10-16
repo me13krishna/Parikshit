@@ -239,3 +239,13 @@ export interface ApiResponse<T> {
   data: T;
   error?: ApiError;
 }
+
+export interface RepoFile {
+  id: string;
+  path: string;
+  language?: string;
+  kind?: string;
+  line_count: number;
+  size_bytes?: number;
+  importance_score?: number;
+}

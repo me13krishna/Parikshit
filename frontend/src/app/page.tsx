@@ -223,6 +223,7 @@ export default function ParikshitCockpit() {
           {activeTab === "mentor" && (
             <MentorChat
               revisionId={revisionId}
+              projectId={projectId}
               onSelectCitation={setActiveCitation}
               onError={handleError}
             />

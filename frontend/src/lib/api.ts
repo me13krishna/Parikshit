@@ -12,6 +12,7 @@ import {
   TwinImpact,
   TwinNode,
   TwinEdge,
+  RepoFile,
   ApiError
 } from "./types";
 
@@ -181,6 +182,11 @@ export const api = {
 
   async getTours(revisionId: string): Promise<TourItem[]> {
     return request<TourItem[]>(`/mentor/tours?revision_id=${encodeURIComponent(revisionId)}`);
+  },
+
+  async getFiles(projectId: string): Promise<RepoFile[]> {
+    const res = await request<{ files: RepoFile[]; count: number }>(`/mentor/${encodeURIComponent(projectId)}/files`);
+    return res.files || [];
   },
 
   // Tasks & Builder

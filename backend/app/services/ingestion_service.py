@@ -134,24 +134,29 @@ class IngestionService:
         }
 
     @staticmethod
-    def _validate_git_url(git_url: str) -> None:
-        if git_url.startswith("-"):
+    def _validate_git_url(git_url: str) -> str:
+        url = git_url.strip()
+        if url.startswith("-"):
             raise AppError("Git URL cannot start with a dash", code="INVALID_GIT_URL")
-        parsed = urllib.parse.urlparse(git_url)
+        if not url.startswith("https://"):
+            raise AppError("Git clone only permits https:// URLs", code="INVALID_GIT_URL")
+        parsed = urllib.parse.urlparse(url)
         if parsed.scheme.lower() != "https":
             raise AppError("Git clone only permits https:// URLs", code="INVALID_GIT_URL")
 
         allowed_hosts = [h.strip().lower() for h in settings.ALLOWED_GIT_HOSTS.split(",") if h.strip()]
         host = (parsed.hostname or "").lower()
-        if host not in allowed_hosts:
+        is_allowed = host in allowed_hosts or any(host.endswith(f".{ah}") or host == ah for ah in allowed_hosts)
+        if not is_allowed:
             raise AppError(
                 f"Git host '{host}' is not in allowed hosts: {allowed_hosts}",
                 code="GIT_HOST_NOT_ALLOWED"
             )
+        return url
 
     @classmethod
     def _clone_git(cls, git_url: str, dest_dir: Path) -> str:
-        cls._validate_git_url(git_url)
+        clean_url = cls._validate_git_url(git_url)
         dest_dir.parent.mkdir(parents=True, exist_ok=True)
         if dest_dir.exists():
             shutil.rmtree(dest_dir)
@@ -160,7 +165,7 @@ class IngestionService:
             **os.environ,
             "GIT_TERMINAL_PROMPT": "0"
         }
-        cmd = ["git", "clone", "--depth", "1", "--", git_url, str(dest_dir)]
+        cmd = ["git", "clone", "--depth", "1", "--", clean_url, str(dest_dir)]
         res = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if res.returncode != 0:
             raise AppError(f"Git clone failed: {res.stderr.strip()}", code="GIT_CLONE_FAILED")
@@ -176,13 +181,31 @@ class IngestionService:
     @classmethod
     def _validate_local_source(cls, source_path: Path) -> None:
         import tempfile
+        resolved_src = source_path.resolve()
+
+        # Reject sensitive system root directories unconditionally
+        system_roots = [
+            "c:\\windows", "c:\\winnt", "c:\\system volume information", "c:\\recovery",
+            "/etc", "/bin", "/sbin", "/usr", "/sys", "/proc", "/dev", "/boot", "/root"
+        ]
+        res_str = str(resolved_src).lower().rstrip("/\\")
+        for sr in system_roots:
+            if res_str == sr or res_str.startswith(sr + "\\") or res_str.startswith(sr + "/"):
+                raise AppError(
+                    f"Local source directory cannot be a system directory: {source_path}",
+                    code="LOCAL_SOURCE_DISALLOWED"
+                )
+
         allowed_roots = [
             Path(r.strip()).resolve()
             for r in settings.PARIKSHIT_LOCAL_SOURCE_ROOTS.split(",")
             if r.strip()
         ]
         allowed_roots.append(Path(tempfile.gettempdir()).resolve())
-        resolved_src = source_path.resolve()
+        if settings.PARIKSHIT_ENV == "development":
+            allowed_roots.append(Path.cwd().resolve())
+            allowed_roots.append(Path.home().resolve())
+
         is_allowed = False
         for root in allowed_roots:
             try:
@@ -192,24 +215,14 @@ class IngestionService:
             except ValueError:
                 continue
 
-        if not is_allowed and settings.PARIKSHIT_ENV != "development":
+        if not is_allowed:
             raise AppError(
                 f"Local source path '{source_path}' is not within allowed source roots",
                 code="LOCAL_SOURCE_DISALLOWED"
             )
-        elif not is_allowed:
-            # In development, also check repository workspace root
-            cwd = Path.cwd().resolve()
-            try:
-                resolved_src.relative_to(cwd)
-                is_allowed = True
-            except ValueError:
-                pass
-            if not is_allowed:
-                raise AppError(
-                    f"Local source path '{source_path}' is outside allowed roots",
-                    code="LOCAL_SOURCE_DISALLOWED"
-                )
+
+        if not resolved_src.exists():
+            raise AppError(f"Local source path does not exist: {source_path}", code="NOT_FOUND")
 
     @classmethod
     def _copy_local(cls, source_path: str, dest_dir: Path) -> str:

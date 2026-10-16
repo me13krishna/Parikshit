@@ -51,6 +51,13 @@ class IndexerService:
             await db.execute("UPDATE repo_revisions SET index_status = 'running' WHERE id = ?;", (revision_id,))
             await db.commit()
 
+            # Clean up any previous indexing data for this revision to support idempotent re-indexing
+            await db.execute("DELETE FROM edges WHERE revision_id = ?;", (revision_id,))
+            await db.execute("DELETE FROM symbols WHERE file_id IN (SELECT id FROM files WHERE revision_id = ?);", (revision_id,))
+            await db.execute("DELETE FROM chunks WHERE file_id IN (SELECT id FROM files WHERE revision_id = ?);", (revision_id,))
+            await db.execute("DELETE FROM files WHERE revision_id = ?;", (revision_id,))
+            await db.commit()
+
         logger.info(f"Indexing revision {revision_id} at {storage_path}...")
 
         total_files = 0
@@ -90,10 +97,10 @@ class IndexerService:
 
                     file_id = f"fil_{uuid.uuid4().hex[:12]}"
 
-                    # Insert file
+                    # Insert file safely
                     await db.execute(
                         """
-                        INSERT INTO files (
+                        INSERT OR REPLACE INTO files (
                             id, revision_id, path, language, size_bytes, line_count,
                             content_sha256, kind, importance_score, is_binary, is_ignored
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
@@ -207,7 +214,21 @@ class IndexerService:
             ".md": "markdown",
             ".html": "html",
             ".css": "css",
-            ".sql": "sql"
+            ".sql": "sql",
+            ".go": "go",
+            ".rs": "rust",
+            ".java": "java",
+            ".c": "c",
+            ".cpp": "cpp",
+            ".cc": "cpp",
+            ".h": "c",
+            ".hpp": "cpp",
+            ".rb": "ruby",
+            ".php": "php",
+            ".sh": "shell",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".toml": "toml",
         }
         return MAP.get(ext, "other")
 
@@ -405,6 +426,52 @@ class IndexerService:
                 imp_matches = re.finditer(r"import\s+.*?\s+from\s+['\"](.*?)['\"]", content)
                 for m in imp_matches:
                     imports.append(m.group(1))
+
+        elif lang == "go":
+            fn_matches = re.finditer(r"func\s+(?:\([^)]*\)\s+)?([a-zA-Z0-9_]+)\s*\(", content)
+            for m in fn_matches:
+                line_no = content[:m.start()].count("\n") + 1
+                end_no = min(line_no + 20, len(lines))
+                symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": end_no, "signature": f"func {m.group(1)}(...)"})
+                chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
+            imp_matches = re.finditer(r"import\s+(?:\((.*?)\)|\"([^\"]+)\")", content, re.DOTALL)
+            for m in imp_matches:
+                if m.group(2):
+                    imports.append(m.group(2))
+                elif m.group(1):
+                    for imp_line in m.group(1).splitlines():
+                        clean_imp = imp_line.strip().strip('"')
+                        if clean_imp:
+                            imports.append(clean_imp)
+
+        elif lang == "rust":
+            fn_matches = re.finditer(r"(?:pub\s+)?fn\s+([a-zA-Z0-9_]+)\s*(?:<[^>]*>)?\s*\(", content)
+            for m in fn_matches:
+                line_no = content[:m.start()].count("\n") + 1
+                end_no = min(line_no + 20, len(lines))
+                symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": end_no, "signature": f"fn {m.group(1)}(...)"})
+                chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
+            struct_matches = re.finditer(r"(?:pub\s+)?(?:struct|enum|trait)\s+([a-zA-Z0-9_]+)", content)
+            for m in struct_matches:
+                line_no = content[:m.start()].count("\n") + 1
+                end_no = min(line_no + 25, len(lines))
+                symbols.append({"name": m.group(1), "kind": "class", "start_line": line_no, "end_line": end_no, "signature": f"struct {m.group(1)}"})
+                chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
+
+        elif lang in ("java", "c", "cpp"):
+            class_matches = re.finditer(r"(?:public|protected|private)?\s*(?:static\s*)?(?:class|interface|struct)\s+([a-zA-Z0-9_]+)", content)
+            for m in class_matches:
+                line_no = content[:m.start()].count("\n") + 1
+                end_no = min(line_no + 25, len(lines))
+                symbols.append({"name": m.group(1), "kind": "class", "start_line": line_no, "end_line": end_no, "signature": f"class {m.group(1)}"})
+                chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
+            fn_matches = re.finditer(r"(?:public|protected|private|static|\s)+[a-zA-Z0-9_<>[\]*&]+\s+([a-zA-Z0-9_]+)\s*\([^)]*\)\s*\{", content)
+            for m in fn_matches:
+                if m.group(1) not in ("if", "for", "while", "switch", "catch"):
+                    line_no = content[:m.start()].count("\n") + 1
+                    end_no = min(line_no + 20, len(lines))
+                    symbols.append({"name": m.group(1), "kind": "function", "start_line": line_no, "end_line": end_no, "signature": f"{m.group(1)}(...)"})
+                    chunks.append({"start_line": line_no, "end_line": end_no, "content": "\n".join(lines[line_no - 1 : end_no])})
 
         # If no specific function chunks found or file is small, create full file / block chunks
         if not chunks:
